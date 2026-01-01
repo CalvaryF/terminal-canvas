@@ -17,6 +17,25 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
   const initializedRef = useRef(false)
+  const zoomModeRef = useRef(false)
+
+  // Track z key to prevent focusing terminal during zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'KeyZ') zoomModeRef.current = true
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyZ') zoomModeRef.current = false
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
 
   useEffect(() => {
     if (!terminalRef.current || initializedRef.current) return
@@ -29,27 +48,27 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
       fontSize: 13,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-        cursor: '#e94560',
-        cursorAccent: '#0d1117',
-        selectionBackground: '#264f78',
-        black: '#0d1117',
-        red: '#ff7b72',
-        green: '#7ee787',
-        yellow: '#d29922',
-        blue: '#79c0ff',
-        magenta: '#d2a8ff',
-        cyan: '#a5d6ff',
-        white: '#c9d1d9',
-        brightBlack: '#484f58',
-        brightRed: '#ffa198',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#a5d6ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#b3f0ff',
-        brightWhite: '#f0f6fc'
+        background: '#ffffff',
+        foreground: '#171717',
+        cursor: '#171717',
+        cursorAccent: '#ffffff',
+        selectionBackground: '#d4d4d4',
+        black: '#171717',
+        red: '#dc2626',
+        green: '#16a34a',
+        yellow: '#ca8a04',
+        blue: '#2563eb',
+        magenta: '#9333ea',
+        cyan: '#0891b2',
+        white: '#f5f5f5',
+        brightBlack: '#737373',
+        brightRed: '#ef4444',
+        brightGreen: '#22c55e',
+        brightYellow: '#eab308',
+        brightBlue: '#3b82f6',
+        brightMagenta: '#a855f7',
+        brightCyan: '#06b6d4',
+        brightWhite: '#ffffff'
       }
     })
 
@@ -95,10 +114,41 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
 
   const handleTerminalClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    // Don't focus terminal when in zoom mode (z key held)
+    if (zoomModeRef.current) return
+
     setFocusedNodeId(id)
     // Directly focus the terminal
     if (xtermRef.current) {
       xtermRef.current.focus()
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      // Get paths from all dropped files/folders and join with spaces
+      const paths = Array.from(files)
+        .map(file => {
+          // Escape spaces and special characters in path
+          const path = (file as any).path as string
+          if (path.includes(' ') || path.includes('(') || path.includes(')')) {
+            return `"${path}"`
+          }
+          return path
+        })
+        .join(' ')
+
+      // Write the path(s) to the terminal
+      window.electronAPI.writePty(id, paths)
     }
   }
 
@@ -119,6 +169,8 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
         className="terminal-body nodrag nowheel"
         ref={terminalRef}
         onClick={handleTerminalClick}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         style={{
           width: data.cols * 8 + 16,
           height: data.rows * 17 + 16

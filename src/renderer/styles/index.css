@@ -9,7 +9,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #1a1a2e;
+  background: #fafafa;
 }
 
 .app-container {
@@ -23,13 +23,13 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: #16213e;
-  border-bottom: 1px solid #0f3460;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .toolbar-title {
-  color: #e94560;
+  color: #0a0a0a;
   font-weight: 600;
   font-size: 14px;
   margin-right: 16px;
@@ -37,17 +37,19 @@ html, body, #root {
 
 .toolbar button {
   padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  background: #0f3460;
-  color: #eee;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #fff;
+  color: #0a0a0a;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
 }
 
 .toolbar button:hover {
-  background: #e94560;
+  background: #f5f5f5;
+  border-color: #d4d4d4;
 }
 
 .canvas-container {
@@ -57,30 +59,32 @@ html, body, #root {
 
 .react-flow__node-terminal {
   padding: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
 }
 
 .terminal-node {
   display: flex;
   flex-direction: column;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  border: 2px solid #0f3460;
-  transition: border-color 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e5e5;
+  transition: all 0.15s;
 }
 
 .terminal-node.focused {
-  border-color: #e94560;
+  border-color: #a3a3a3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .terminal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: #16213e;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e5e5e5;
   cursor: grab;
 }
 
@@ -90,7 +94,8 @@ html, body, #root {
 
 .terminal-title {
   font-size: 12px;
-  color: #aaa;
+  font-weight: 500;
+  color: #525252;
   user-select: none;
 }
 
@@ -98,18 +103,18 @@ html, body, #root {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #e94560;
+  background: #ef4444;
   border: none;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
 .terminal-close:hover {
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .terminal-body {
-  background: #0d1117;
+  background: #ffffff;
 }
 
 /* xterm.js overrides */
@@ -122,37 +127,47 @@ html, body, #root {
 }
 
 .xterm-viewport::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #f5f5f5;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #0f3460;
+  background: #d4d4d4;
   border-radius: 4px;
 }
 
 /* React Flow overrides */
 .react-flow__background {
-  background: #1a1a2e !important;
+  background: #fafafa !important;
 }
 
 .react-flow__controls {
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .react-flow__controls button {
-  background: #16213e;
-  border-color: #0f3460;
-  color: #eee;
+  background: #fff;
+  border-color: #e5e5e5;
+  color: #525252;
 }
 
 .react-flow__controls button:hover {
-  background: #0f3460;
+  background: #f5f5f5;
+}
+
+.react-flow__controls button svg {
+  fill: #525252;
 }
 
 .react-flow__minimap {
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.05);
 }
