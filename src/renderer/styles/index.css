@@ -19,37 +19,87 @@ html, body, #root {
   height: 100%;
 }
 
-.toolbar {
+.bottom-toolbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 4px;
+  padding: 8px;
   background: #fff;
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.toolbar-title {
-  color: #0a0a0a;
-  font-weight: 600;
-  font-size: 14px;
-  margin-right: 16px;
-}
-
-.toolbar button {
-  padding: 6px 12px;
   border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  background: #fff;
-  color: #0a0a0a;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.bottom-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #525252;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.toolbar button:hover {
+.bottom-toolbar button:hover {
   background: #f5f5f5;
+  color: #0a0a0a;
+}
+
+.bottom-toolbar button.active {
+  background: #e5e5e5;
+  color: #0a0a0a;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #e5e5e5;
+  margin: 0 4px;
+}
+
+/* Text Node */
+.text-node {
+  min-width: 120px;
+  min-height: 40px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: text;
+}
+
+.text-node:hover {
   border-color: #d4d4d4;
+}
+
+.text-node-content {
+  font-size: 14px;
+  color: #2c2c2c;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.text-node-input {
+  width: 100%;
+  min-width: 200px;
+  min-height: 60px;
+  border: none;
+  outline: none;
+  resize: both;
+  font-family: inherit;
+  font-size: 14px;
+  color: #2c2c2c;
+  background: transparent;
 }
 
 .canvas-container {
@@ -114,7 +164,7 @@ html, body, #root {
 }
 
 .terminal-body {
-  background: #ffffff;
+  background: #f0f0f0;
 }
 
 /* xterm.js overrides */
@@ -136,9 +186,6 @@ html, body, #root {
 }
 
 /* React Flow overrides */
-.react-flow__background {
-  background: #fafafa !important;
-}
 
 .react-flow__controls {
   background: #fff;

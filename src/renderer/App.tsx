@@ -1,23 +1,25 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import Canvas from './components/Canvas'
 import Toolbar from './components/Toolbar'
-import type { TerminalNode } from './types'
+import type { CanvasNode, TerminalNode, TextNode } from './types'
 
-let nodeIdCounter = 0
+export type CanvasMode = 'hand' | 'select'
 
 function App() {
-  const [nodes, setNodes] = useState<TerminalNode[]>([])
+  const [nodes, setNodes] = useState<CanvasNode[]>([])
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [mode, setMode] = useState<CanvasMode>('hand')
 
   const addTerminal = useCallback((command: string) => {
-    const id = `terminal-${++nodeIdCounter}`
+    const id = crypto.randomUUID()
+    const nodeCount = nodes.length
     const newNode: TerminalNode = {
       id,
       type: 'terminal',
       position: {
-        x: 100 + (nodeIdCounter % 3) * 420,
-        y: 100 + Math.floor(nodeIdCounter / 3) * 350
+        x: 100 + (nodeCount % 3) * 420,
+        y: 100 + Math.floor(nodeCount / 3) * 350
       },
       dragHandle: '.dragHandle',
       data: {
@@ -30,7 +32,24 @@ function App() {
     }
     setNodes((nds) => [...nds, newNode])
     setFocusedNodeId(id)
-  }, [])
+  }, [nodes.length])
+
+  const addTextbox = useCallback(() => {
+    const id = crypto.randomUUID()
+    const nodeCount = nodes.length
+    const newNode: TextNode = {
+      id,
+      type: 'text',
+      position: {
+        x: 150 + (nodeCount % 5) * 180,
+        y: 150 + Math.floor(nodeCount / 5) * 120
+      },
+      data: {
+        text: ''
+      }
+    }
+    setNodes((nds) => [...nds, newNode])
+  }, [nodes.length])
 
   const removeNode = useCallback((nodeId: string) => {
     window.electronAPI.killPty(nodeId)
@@ -40,16 +59,35 @@ function App() {
     }
   }, [focusedNodeId])
 
+  // Mode switching: h = hand (pan), v = select (move nodes)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't switch modes when typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      if (e.code === 'KeyH') {
+        setMode('hand')
+      } else if (e.code === 'KeyV') {
+        setMode('select')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <ReactFlowProvider>
       <div className="app-container">
-        <Toolbar onAddTerminal={addTerminal} />
+        <Toolbar onAddTerminal={addTerminal} onAddTextbox={addTextbox} mode={mode} onModeChange={setMode} />
         <Canvas
           nodes={nodes}
           setNodes={setNodes}
           focusedNodeId={focusedNodeId}
           setFocusedNodeId={setFocusedNodeId}
           onRemoveNode={removeNode}
+          mode={mode}
         />
       </div>
     </ReactFlowProvider>

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useEffect, useRef, createContext, useContext } fr
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   applyNodeChanges,
@@ -11,32 +12,38 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import TerminalNode from './TerminalNode'
-import type { TerminalNode as TerminalNodeType } from '../types'
+import TextNode from './TextNode'
+import type { CanvasNode } from '../types'
+import type { CanvasMode } from '../App'
 
 interface CanvasContextType {
   focusedNodeId: string | null
   setFocusedNodeId: (id: string | null) => void
   onRemoveNode: (id: string) => void
+  mode: CanvasMode
 }
 
 export const CanvasContext = createContext<CanvasContextType>({
   focusedNodeId: null,
   setFocusedNodeId: () => {},
-  onRemoveNode: () => {}
+  onRemoveNode: () => {},
+  mode: 'hand'
 })
 
 export const useCanvasContext = () => useContext(CanvasContext)
 
 const nodeTypes: NodeTypes = {
-  terminal: TerminalNode
+  terminal: TerminalNode,
+  text: TextNode
 }
 
 interface CanvasProps {
-  nodes: TerminalNodeType[]
-  setNodes: React.Dispatch<React.SetStateAction<TerminalNodeType[]>>
+  nodes: CanvasNode[]
+  setNodes: React.Dispatch<React.SetStateAction<CanvasNode[]>>
   focusedNodeId: string | null
   setFocusedNodeId: (id: string | null) => void
   onRemoveNode: (id: string) => void
+  mode: CanvasMode
 }
 
 function ZoomHandler() {
@@ -97,17 +104,17 @@ function ZoomHandler() {
   return null
 }
 
-function Canvas({ nodes, setNodes, focusedNodeId, setFocusedNodeId, onRemoveNode }: CanvasProps) {
+function Canvas({ nodes, setNodes, focusedNodeId, setFocusedNodeId, onRemoveNode, mode }: CanvasProps) {
   const onNodesChange = useCallback(
-    (changes: NodeChange<TerminalNodeType>[]) => {
-      setNodes((nds) => applyNodeChanges(changes, nds) as TerminalNodeType[])
+    (changes: NodeChange<CanvasNode>[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds) as CanvasNode[])
     },
     [setNodes]
   )
 
   const contextValue = useMemo(
-    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode }),
-    [focusedNodeId, setFocusedNodeId, onRemoveNode]
+    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode }),
+    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode]
   )
 
   return (
@@ -123,14 +130,15 @@ function Canvas({ nodes, setNodes, focusedNodeId, setFocusedNodeId, onRemoveNode
           maxZoom={2}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}
           panOnScroll
-          panOnDrag
+          panOnDrag={mode === 'hand'}
+          nodesDraggable={mode === 'select'}
           zoomOnDoubleClick={false}
           selectionOnDrag={false}
           selectNodesOnDrag={false}
           nodeDragThreshold={5}
           onPaneClick={() => setFocusedNodeId(null)}
         >
-          <Background color="#e5e5e5" gap={20} />
+          <Background variant={BackgroundVariant.Dots} color="#d0d0d0" gap={16} size={2} />
           <Controls />
           <MiniMap
             nodeColor="#d4d4d4"
