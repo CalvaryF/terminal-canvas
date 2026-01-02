@@ -42,11 +42,11 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
     initializedRef.current = true
 
     const term = new Terminal({
-      cols: data.cols,
-      rows: data.rows,
       cursorBlink: true,
       fontSize: 13,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      scrollback: 1000,
+      smoothScrollDuration: 0,
       theme: {
         // Mountaineer Light colorscheme
         background: '#f0f0f0',
@@ -77,11 +77,54 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
     term.loadAddon(fitAddon)
     term.open(terminalRef.current)
 
+    // Fit terminal to container and get actual dimensions
+    fitAddon.fit()
+
     xtermRef.current = term
 
-    // PTY output -> xterm
+    // Track current dimensions to detect changes
+    let currentCols = term.cols
+    let currentRows = term.rows
+
+    // ResizeObserver with debounce to handle container resizes
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null
+    const resizeObserver = new ResizeObserver(() => {
+      if (resizeTimeout) clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(() => {
+        fitAddon.fit()
+        // Only resize PTY if dimensions actually changed
+        if (term.cols !== currentCols || term.rows !== currentRows) {
+          currentCols = term.cols
+          currentRows = term.rows
+          window.electronAPI.resizePty(id, currentCols, currentRows)
+        }
+      }, 100) // 100ms debounce
+    })
+    resizeObserver.observe(terminalRef.current)
+
+    // Track buffer type changes (normal vs alternate)
+    let lastBufferType = term.buffer.active.type
+    const bufferChangeHandler = term.onData(() => {
+      const currentType = term.buffer.active.type
+      if (currentType !== lastBufferType) {
+        lastBufferType = currentType
+        // When switching buffers, reset viewport to bottom to prevent scroll issues
+        term.scrollToBottom()
+      }
+    })
+
+    // PTY output -> xterm with scroll correction
     const removeDataListener = window.electronAPI.onPtyData(id, (output) => {
+      const buffer = term.buffer.active
+      const wasAtBottom = buffer.viewportY >= buffer.baseY - 1
+
       term.write(output)
+
+      // Self-correcting scroll: if we were at bottom before write, stay at bottom
+      // Also always scroll to bottom in alternate buffer (no scrollback there anyway)
+      if (wasAtBottom || buffer.type === 'alternate') {
+        requestAnimationFrame(() => term.scrollToBottom())
+      }
     })
 
     // PTY exit handler
@@ -94,10 +137,13 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
       window.electronAPI.writePty(id, input)
     })
 
-    // Create PTY
-    window.electronAPI.createPty(id, data.command, data.cwd, data.cols, data.rows)
+    // Create PTY with actual measured dimensions (from fitAddon)
+    window.electronAPI.createPty(id, data.command, data.cwd, term.cols, term.rows)
 
     return () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout)
+      resizeObserver.disconnect()
+      bufferChangeHandler.dispose()
       dataDisposable.dispose()
       removeDataListener()
       removeExitListener()
