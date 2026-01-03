@@ -365,6 +365,17 @@ function AppContent() {
     }
   }, [queueTerminalMap, nodes])
 
+  // Handle text node content changes
+  const handleTextChange = useCallback((nodeId: string, text: string) => {
+    setNodes(nds => nds.map(n => {
+      if (n.id !== nodeId || n.type !== 'text') return n
+      return {
+        ...n,
+        data: { ...n.data, text }
+      }
+    }))
+  }, [])
+
   // Handle file added in folder - copy to connected folders
   const handleFolderFileAdded = useCallback((sourceNodeId: string, filePath: string) => {
     console.log('[App] File added in folder:', sourceNodeId, filePath)
@@ -442,6 +453,7 @@ function AppContent() {
           onAddFolderAtPosition={addFolderAtPosition}
           onDuplicateNodes={handleDuplicateNodes}
           onSendCommand={handleSendCommand}
+          onTextChange={handleTextChange}
         />
         <FilePreviewModal
           context={previewContext}

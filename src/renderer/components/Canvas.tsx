@@ -67,6 +67,7 @@ interface CanvasContextType {
   onFilePreview: ((context: PreviewContext) => void) | null
   onFolderFileAdded: ((nodeId: string, filePath: string) => void) | null
   onSendCommand: ((queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void) | null
+  onTextChange: ((nodeId: string, text: string) => void) | null
 }
 
 export const CanvasContext = createContext<CanvasContextType>({
@@ -78,7 +79,8 @@ export const CanvasContext = createContext<CanvasContextType>({
   setIsZoomActive: () => {},
   onFilePreview: null,
   onFolderFileAdded: null,
-  onSendCommand: null
+  onSendCommand: null,
+  onTextChange: null
 })
 
 export const useCanvasContext = () => useContext(CanvasContext)
@@ -110,6 +112,7 @@ interface CanvasProps {
   onAddFolderAtPosition: (folderPath: string, x: number, y: number) => void
   onDuplicateNodes: (nodes: CanvasNode[]) => void
   onSendCommand: (queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void
+  onTextChange: (nodeId: string, text: string) => void
 }
 
 function ZoomHandler() {
@@ -552,7 +555,7 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
   )
 }
 
-function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes, onSendCommand }: CanvasProps) {
+function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes, onSendCommand, onTextChange }: CanvasProps) {
   const [isZoomActive, setIsZoomActive] = useState(false)
   const { screenToFlowPosition } = useReactFlow()
   const duplicatedRef = useRef(false)
@@ -731,8 +734,8 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
   }, [nodes, setEdges])
 
   const contextValue = useMemo(
-    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded, onSendCommand }),
-    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded, onSendCommand]
+    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange }),
+    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange]
   )
 
   return (

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { useCanvasContext } from './Canvas'
 
 export interface TextNodeData {
   text: string
-  onChange?: (text: string) => void
 }
 
 type TextNodeComponentProps = NodeProps<TextNodeData>
@@ -12,9 +12,17 @@ const TextNodeComponent = memo(function TextNodeComponent({
   id,
   data
 }: TextNodeComponentProps) {
+  const { onTextChange } = useCanvasContext()
   const [isEditing, setIsEditing] = useState(false)
   const [text, setText] = useState(data.text || 'Double-click to edit')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Sync local state with data.text when it changes externally
+  useEffect(() => {
+    if (!isEditing && data.text !== undefined) {
+      setText(data.text || 'Double-click to edit')
+    }
+  }, [data.text, isEditing])
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -29,8 +37,8 @@ const TextNodeComponent = memo(function TextNodeComponent({
 
   const handleBlur = () => {
     setIsEditing(false)
-    if (data.onChange) {
-      data.onChange(text)
+    if (onTextChange) {
+      onTextChange(id, text)
     }
   }
 
