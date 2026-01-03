@@ -22,9 +22,9 @@ import TerminalNode from './TerminalNode'
 import TextNode from './TextNode'
 import DrawingNode from './DrawingNode'
 import FolderNode from './FolderNode'
-import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType } from '../types'
+import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType, FileInfo } from '../types'
 import type { CanvasMode } from '../App'
-import type { PreviewFile } from './FilePreviewModal'
+import type { PreviewContext } from './FilePreviewModal'
 import { pointsToSVGPath, getBoundingBox, normalizePoints, smoothPoints, type Point } from '../utils/pathSmoothing'
 
 interface CanvasContextType {
@@ -34,7 +34,7 @@ interface CanvasContextType {
   mode: CanvasMode
   isZoomActive: boolean
   setIsZoomActive: (active: boolean) => void
-  onFilePreview: ((file: PreviewFile) => void) | null
+  onFilePreview: ((context: PreviewContext) => void) | null
   onFolderFileAdded: ((nodeId: string, filePath: string) => void) | null
 }
 
@@ -68,7 +68,7 @@ interface CanvasProps {
   onRemoveNode: (id: string) => void
   mode: CanvasMode
   drawColor: string
-  onFilePreview: (file: PreviewFile) => void
+  onFilePreview: (context: PreviewContext) => void
   onFolderFileAdded: (nodeId: string, filePath: string) => void
   onAddFolderAtPosition: (folderPath: string, x: number, y: number) => void
 }

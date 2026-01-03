@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ReactFlowProvider, type Edge } from '@xyflow/react'
 import Canvas from './components/Canvas'
 import Toolbar from './components/Toolbar'
-import { FilePreviewModal, type PreviewFile } from './components/FilePreviewModal'
-import type { CanvasNode, TerminalNode, TextNode, FolderNode } from './types'
+import { FilePreviewModal, type PreviewContext } from './components/FilePreviewModal'
+import type { CanvasNode, TerminalNode, TextNode, FolderNode, FileInfo } from './types'
 
 export type CanvasMode = 'hand' | 'select' | 'draw'
 
@@ -15,7 +15,7 @@ function App() {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [mode, setMode] = useState<CanvasMode>('hand')
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0])
-  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null)
+  const [previewContext, setPreviewContext] = useState<PreviewContext>(null)
 
   const addTerminal = useCallback((command: string) => {
     const id = crypto.randomUUID()
@@ -209,6 +209,11 @@ function App() {
     }
   }, [folderEdgeMap, nodes])
 
+  // Handle file change from preview modal (arrow key navigation)
+  const handlePreviewFileChange = useCallback((file: FileInfo) => {
+    setPreviewContext(prev => prev ? { ...prev, file } : null)
+  }, [])
+
   return (
     <ReactFlowProvider>
       <div className="app-container">
@@ -233,13 +238,14 @@ function App() {
           onRemoveNode={removeNode}
           mode={mode}
           drawColor={drawColor}
-          onFilePreview={setPreviewFile}
+          onFilePreview={setPreviewContext}
           onFolderFileAdded={handleFolderFileAdded}
           onAddFolderAtPosition={addFolderAtPosition}
         />
         <FilePreviewModal
-          file={previewFile}
-          onClose={() => setPreviewFile(null)}
+          context={previewContext}
+          onClose={() => setPreviewContext(null)}
+          onFileChange={handlePreviewFileChange}
         />
       </div>
     </ReactFlowProvider>

@@ -1,14 +1,17 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import hljs from 'highlight.js'
+import type { FileInfo } from '../types'
 
-export type PreviewFile = {
-  path: string
-  type: 'image' | 'text'
-}
+export type PreviewContext = {
+  file: FileInfo
+  files: FileInfo[]
+  folderName: string
+} | null
 
 interface FilePreviewModalProps {
-  file: PreviewFile | null
+  context: PreviewContext
   onClose: () => void
+  onFileChange: (file: FileInfo) => void
 }
 
 // Map file extensions to highlight.js language names
@@ -48,82 +51,190 @@ const extensionToLanguage: Record<string, string> = {
   dockerfile: 'dockerfile'
 }
 
-export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
+const getFileIcon = (file: FileInfo): string => {
+  if (file.isDirectory) return '📁'
+  if (file.isImage) return '🖼️'
+  const iconMap: Record<string, string> = {
+    pdf: '📄',
+    doc: '📝', docx: '📝',
+    xls: '📊', xlsx: '📊',
+    txt: '📃',
+    js: '📜', ts: '📜', tsx: '📜', jsx: '📜',
+    json: '📋',
+    md: '📖',
+    html: '🌐', css: '🎨',
+    py: '🐍',
+    rb: '💎',
+    go: '🔷',
+    rs: '🦀',
+    swift: '🍎',
+    sh: '⚡', bash: '⚡', zsh: '⚡'
+  }
+  return iconMap[file.extension] || '📄'
+}
+
+export function FilePreviewModal({ context, onClose, onFileChange }: FilePreviewModalProps) {
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const codeRef = useRef<HTMLElement>(null)
+  const fileListRef = useRef<HTMLUListElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  // Get previewable files (images and text files only)
+  const previewableFiles = useMemo(() =>
+    context?.files.filter(f => f.isImage || f.isText) || [],
+    [context?.files]
+  )
+  const currentIndex = previewableFiles.findIndex(f => f.path === context?.file.path)
+
+  // Use refs to avoid stale closures in keyboard handler
+  const previewableFilesRef = useRef(previewableFiles)
+  const currentIndexRef = useRef(currentIndex)
+  const onFileChangeRef = useRef(onFileChange)
+  const onCloseRef = useRef(onClose)
 
   useEffect(() => {
-    if (file) {
-      setLoading(true)
-      if (file.type === 'image') {
-        window.electronAPI.readImageAsBase64(file.path)
-          .then(setContent)
-          .finally(() => setLoading(false))
-      } else {
-        window.electronAPI.readTextFile(file.path)
+    previewableFilesRef.current = previewableFiles
+    currentIndexRef.current = currentIndex
+    onFileChangeRef.current = onFileChange
+    onCloseRef.current = onClose
+  })
+
+  const navigateToFile = useCallback((direction: 'prev' | 'next') => {
+    const files = previewableFilesRef.current
+    const idx = currentIndexRef.current
+    if (files.length === 0 || idx === -1) return
+
+    let newIndex: number
+    if (direction === 'prev') {
+      newIndex = idx <= 0 ? files.length - 1 : idx - 1
+    } else {
+      newIndex = idx >= files.length - 1 ? 0 : idx + 1
+    }
+
+    onFileChangeRef.current(files[newIndex])
+  }, [])
+
+  useEffect(() => {
+    if (context?.file) {
+      if (context.file.isImage) {
+        // Use custom protocol URL - no loading needed, browser handles it
+        setContent(`local-file://${encodeURIComponent(context.file.path)}`)
+        setLoading(false)
+      } else if (context.file.isText) {
+        setLoading(true)
+        window.electronAPI.readTextFile(context.file.path)
           .then(setContent)
           .finally(() => setLoading(false))
       }
     } else {
       setContent(null)
     }
-  }, [file])
+  }, [context?.file])
 
   // Apply syntax highlighting after content loads
   useEffect(() => {
-    if (content && file?.type === 'text' && codeRef.current) {
-      const extension = file.path.split('.').pop()?.toLowerCase() || ''
+    if (content && context?.file.isText && codeRef.current) {
+      const extension = context.file.extension
       const language = extensionToLanguage[extension]
 
       if (language && hljs.getLanguage(language)) {
         const highlighted = hljs.highlight(content, { language })
         codeRef.current.innerHTML = highlighted.value
       } else {
-        // Try auto-detection for unknown extensions
         const result = hljs.highlightAuto(content)
         codeRef.current.innerHTML = result.value
       }
     }
-  }, [content, file])
+  }, [content, context?.file])
+
+  // Scroll active file into view in sidebar
+  useEffect(() => {
+    if (fileListRef.current && currentIndex >= 0) {
+      const activeItem = fileListRef.current.children[currentIndex] as HTMLElement
+      if (activeItem) {
+        activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [currentIndex])
+
+  // Auto-focus overlay for keyboard events
+  useEffect(() => {
+    if (context && overlayRef.current) {
+      overlayRef.current.focus()
+    }
+  }, [context, content])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        navigateToFile('prev')
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        navigateToFile('next')
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [navigateToFile])
 
-  if (!file) return null
+  if (!context) return null
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose()
   }
 
-  const fileName = file.path.split('/').pop() || 'File'
-  const extension = fileName.split('.').pop()?.toLowerCase() || ''
+  const handleFileClick = (file: FileInfo) => {
+    if (file.isImage || file.isText) {
+      onFileChange(file)
+    }
+  }
+
+  const isTextFile = context.file.isText
 
   return (
-    <div className="file-preview-overlay" onClick={handleBackdropClick}>
-      <div className={`file-preview-container ${file.type === 'text' ? 'text-preview' : ''}`}>
-        <div className="file-preview-header">
-          <span className="file-preview-filename">{fileName}</span>
-          <button className="file-preview-close" onClick={onClose} />
+    <div className="file-preview-overlay" ref={overlayRef} tabIndex={-1} onClick={handleBackdropClick}>
+      <div className="file-preview-layout">
+        {/* Folder sidebar */}
+        <div className="file-preview-sidebar">
+          <div className="file-preview-sidebar-header">
+            <span>📂 {context.folderName}</span>
+          </div>
+          <ul className="file-preview-sidebar-list" ref={fileListRef}>
+            {context.files.map(file => (
+              <li
+                key={file.path}
+                className={`file-preview-sidebar-item ${file.path === context.file.path ? 'active' : ''} ${file.isImage || file.isText ? 'clickable' : ''}`}
+                onClick={() => handleFileClick(file)}
+              >
+                <span className="file-icon">{getFileIcon(file)}</span>
+                <span className="file-name">{file.name}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        {loading ? (
-          <div className="file-preview-loading">Loading...</div>
-        ) : content ? (
-          file.type === 'image' ? (
-            <img src={content} alt={fileName} />
-          ) : (
-            <pre className="file-preview-code">
-              <code ref={codeRef}>{content}</code>
-            </pre>
-          )
-        ) : null}
+
+        {/* Preview content */}
+        <div className={`file-preview-container ${isTextFile ? 'text-preview' : ''}`}>
+          <div className="file-preview-header">
+            <span className="file-preview-filename">{context.file.name}</span>
+            <button className="file-preview-close" onClick={onClose} />
+          </div>
+          {loading ? (
+            <div className="file-preview-loading">Loading...</div>
+          ) : content ? (
+            context.file.isImage ? (
+              <img src={content} alt={context.file.name} />
+            ) : (
+              <pre className="file-preview-code">
+                <code ref={codeRef}>{content}</code>
+              </pre>
+            )
+          ) : null}
+        </div>
       </div>
     </div>
   )

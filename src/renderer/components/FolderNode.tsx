@@ -75,23 +75,22 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
     }
   }, [data.folderPath, files.length])
 
+  const folderName = data.folderPath?.split('/').pop() || 'Folder'
+
   const handleFileClick = useCallback((file: FileInfo) => {
-    console.log('[FolderNode] File clicked:', file.name, 'isImage:', file.isImage, 'isText:', file.isText, 'onFilePreview:', !!onFilePreview)
-    if (file.isImage && onFilePreview) {
-      console.log('[FolderNode] Opening image preview for:', file.path)
-      onFilePreview({ path: file.path, type: 'image' })
-    } else if (file.isText && onFilePreview) {
-      console.log('[FolderNode] Opening text preview for:', file.path)
-      onFilePreview({ path: file.path, type: 'text' })
+    if ((file.isImage || file.isText) && onFilePreview) {
+      onFilePreview({
+        file,
+        files,
+        folderName
+      })
     }
-  }, [onFilePreview])
+  }, [onFilePreview, files, folderName])
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation()
     onRemoveNode(id)
   }
-
-  const folderName = data.folderPath?.split('/').pop() || 'Select Folder'
 
   return (
     <div className="folder-node">

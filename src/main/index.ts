@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { ptyManager } from './pty-manager'
 import { fileManager } from './file-manager'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
@@ -77,7 +78,18 @@ ipcMain.handle(IPC_CHANNELS.FOLDER_READ_TEXT, (_, filePath: string) => {
   return fileManager.readTextFile(filePath)
 })
 
+// Register custom protocol for serving local files (avoids base64 encoding freeze)
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'local-file', privileges: { bypassCSP: true, stream: true } }
+])
+
 app.whenReady().then(() => {
+  // Handle local-file:// protocol to serve files directly
+  protocol.handle('local-file', (request) => {
+    const filePath = decodeURIComponent(request.url.replace('local-file://', ''))
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+
   createWindow()
 
   app.on('activate', () => {
