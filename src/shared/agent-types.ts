@@ -305,3 +305,43 @@ export const DEFAULT_AGENT_SERVER_CONFIG: AgentServerConfig = {
   host: '127.0.0.1',
   enabled: false // Must be explicitly enabled
 }
+
+// ============================================================
+// Batch API Types
+// ============================================================
+
+export type BatchOperationType =
+  | 'createTerminal'
+  | 'createQueue'
+  | 'createTextNode'
+  | 'createFolder'
+  | 'createEdge'
+  | 'deleteNode'
+  | 'deleteEdge'
+  | 'updateNode'
+  | 'addQueueCommand'
+  | 'setViewport'
+
+export interface BatchOperation {
+  op: BatchOperationType
+  tempId?: string  // e.g., "$term1" - for referencing newly created nodes
+  params: Record<string, unknown>
+}
+
+export interface BatchRequest {
+  operations: BatchOperation[]
+}
+
+export interface BatchOperationResult {
+  success: boolean
+  data?: unknown
+  tempId?: string
+  error?: { code: string; message: string }
+}
+
+export interface BatchResponse {
+  success: boolean
+  results: BatchOperationResult[]
+  idMap?: Record<string, string>  // tempId -> realId mapping
+  failedAt?: number  // Index of first failure
+}

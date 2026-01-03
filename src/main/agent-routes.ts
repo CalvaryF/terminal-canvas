@@ -12,7 +12,11 @@ import {
   CreateEdgeRequest,
   SaveCanvasRequest,
   CreateQueueNodeRequest,
-  AddQueueCommandRequest
+  AddQueueCommandRequest,
+  BatchRequest,
+  BatchResponse,
+  BatchOperationResult,
+  BatchOperationType
 } from '../shared/agent-types'
 
 type RouteHandler = (
@@ -98,6 +102,9 @@ export class AgentRoutes {
     this.addRoute('POST', '/api/v1/saves', this.saveCanvas.bind(this))
     this.addRoute('POST', '/api/v1/saves/:filename/load', this.loadCanvas.bind(this))
     this.addRoute('DELETE', '/api/v1/saves/:filename', this.deleteSave.bind(this))
+
+    // Batch operations
+    this.addRoute('POST', '/api/v1/batch', this.executeBatch.bind(this))
   }
 
   async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
@@ -428,6 +435,143 @@ export class AgentRoutes {
   private async deleteSave(_req: IncomingMessage, res: ServerResponse, params: Record<string, string>) {
     await canvasStorage.delete(params.filename)
     this.sendJson(res, { deleted: params.filename })
+  }
+
+  // ============================================================
+  // Batch Handler
+  // ============================================================
+
+  private async executeBatch(_req: IncomingMessage, res: ServerResponse, _params: Record<string, string>, body: unknown) {
+    const { operations } = body as BatchRequest
+
+    if (!operations || !Array.isArray(operations)) {
+      this.sendError(res, 400, AgentErrorCode.INVALID_REQUEST, 'Missing operations array')
+      return
+    }
+
+    const results: BatchOperationResult[] = []
+    const idMap = new Map<string, string>()  // $tempId -> realId
+
+    for (let i = 0; i < operations.length; i++) {
+      const op = operations[i]
+
+      // Resolve any $tempId references in params
+      const resolvedParams = this.resolveIdRefs(op.params, idMap)
+
+      try {
+        const result = await this.executeOperation(op.op, resolvedParams)
+
+        // If this operation created something with an ID and has a tempId, map it
+        if (op.tempId && result && typeof result === 'object' && 'id' in result) {
+          idMap.set(op.tempId, (result as { id: string }).id)
+        }
+
+        results.push({
+          success: true,
+          data: result,
+          tempId: op.tempId
+        })
+      } catch (err) {
+        const error = err as Error
+        results.push({
+          success: false,
+          error: { code: 'OPERATION_FAILED', message: error.message },
+          tempId: op.tempId
+        })
+
+        // Stop on first error
+        const response: BatchResponse = {
+          success: false,
+          results,
+          idMap: Object.fromEntries(idMap),
+          failedAt: i
+        }
+        this.sendJson(res, response)
+        return
+      }
+    }
+
+    const response: BatchResponse = {
+      success: true,
+      results,
+      idMap: Object.fromEntries(idMap)
+    }
+    this.sendJson(res, response)
+  }
+
+  private resolveIdRefs(
+    params: Record<string, unknown>,
+    idMap: Map<string, string>
+  ): Record<string, unknown> {
+    const resolved: Record<string, unknown> = {}
+
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string' && value.startsWith('$')) {
+        // This is a tempId reference
+        const realId = idMap.get(value)
+        if (realId) {
+          resolved[key] = realId
+        } else {
+          // Keep the original value if not yet resolved (might be an error)
+          resolved[key] = value
+        }
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively resolve nested objects
+        resolved[key] = this.resolveIdRefs(value as Record<string, unknown>, idMap)
+      } else {
+        resolved[key] = value
+      }
+    }
+
+    return resolved
+  }
+
+  private async executeOperation(
+    op: BatchOperationType,
+    params: Record<string, unknown>
+  ): Promise<unknown> {
+    switch (op) {
+      case 'createTerminal':
+        return agentController.createTerminal(params as CreateTerminalRequest)
+
+      case 'createQueue':
+        return agentController.createQueueNode(params as CreateQueueNodeRequest)
+
+      case 'createTextNode':
+        return agentController.createTextNode(params as CreateTextNodeRequest)
+
+      case 'createFolder':
+        return agentController.createFolderNode(params as CreateFolderNodeRequest)
+
+      case 'createEdge':
+        return agentController.createEdge(params as CreateEdgeRequest)
+
+      case 'deleteNode':
+        await agentController.deleteNode(params.id as string)
+        return { deleted: params.id }
+
+      case 'deleteEdge':
+        await agentController.deleteEdge(params.id as string)
+        return { deleted: params.id }
+
+      case 'updateNode':
+        return agentController.updateNode(
+          params.id as string,
+          params.updates as Record<string, unknown>
+        )
+
+      case 'addQueueCommand':
+        return agentController.addQueueCommand(
+          params.queueId as string,
+          params.command as string
+        )
+
+      case 'setViewport':
+        return agentController.setViewport(params as { x: number; y: number; zoom: number })
+
+      default:
+        throw new Error(`Unknown operation: ${op}`)
+    }
   }
 }
 

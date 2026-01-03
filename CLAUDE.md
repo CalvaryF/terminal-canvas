@@ -138,6 +138,31 @@ Base URL: `http://127.0.0.1:4000/api/v1`
 | POST | `/queues/:id/commands` | Add command `{ command: "ls -la" }` |
 | DELETE | `/queues/:id/commands/:commandId` | Remove pending command |
 | DELETE | `/canvas/nodes/:id` | Delete any node |
+| POST | `/batch` | Execute multiple operations in one request |
+
+### Batch Operations
+
+Execute multiple operations in a single request with temporary ID references:
+
+```bash
+curl -X POST http://127.0.0.1:4000/api/v1/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operations": [
+      { "op": "createTerminal", "tempId": "$t1", "params": { "cwd": "/tmp" } },
+      { "op": "createQueue", "tempId": "$q1", "params": {} },
+      { "op": "createEdge", "params": { "source": "$q1", "target": "$t1" } },
+      { "op": "addQueueCommand", "params": { "queueId": "$q1", "command": "npm install" } },
+      { "op": "addQueueCommand", "params": { "queueId": "$q1", "command": "npm test" } }
+    ]
+  }'
+```
+
+**Temporary IDs**: Use `$name` syntax to reference nodes created earlier in the same batch. The `idMap` in the response shows the mapping from temp IDs to real UUIDs.
+
+**Supported operations**: `createTerminal`, `createQueue`, `createTextNode`, `createFolder`, `createEdge`, `deleteNode`, `deleteEdge`, `updateNode`, `addQueueCommand`, `setViewport`
+
+**Error handling**: Stops on first error, returns partial results with `failedAt` index.
 
 ### WebSocket Streaming
 
