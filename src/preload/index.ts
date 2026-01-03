@@ -13,6 +13,41 @@ export interface FileInfo {
   modifiedTime: number
 }
 
+// Canvas save/load types
+export interface CanvasViewport {
+  x: number
+  y: number
+  zoom: number
+}
+
+export interface CanvasNodeData {
+  id: string
+  type: 'terminal' | 'text' | 'drawing' | 'folder'
+  position: { x: number; y: number }
+  data: Record<string, unknown>
+}
+
+export interface CanvasEdgeData {
+  id: string
+  source: string
+  target: string
+  sourceHandle?: string
+  targetHandle?: string
+}
+
+export interface CanvasData {
+  viewport: CanvasViewport
+  nodes: CanvasNodeData[]
+  edges: CanvasEdgeData[]
+}
+
+export interface SaveFileMetadata {
+  name: string
+  filename: string
+  savedAt: string
+  nodeCount: number
+}
+
 // Store callbacks by nodeId
 const dataCallbacks = new Map<string, (data: string) => void>()
 const exitCallbacks = new Map<string, (exitCode: number) => void>()
@@ -51,6 +86,7 @@ export interface ElectronAPI {
   writePty: (nodeId: string, data: string) => void
   resizePty: (nodeId: string, cols: number, rows: number) => void
   killPty: (nodeId: string) => void
+  getPtyCwd: (nodeId: string) => Promise<string | null>
   onPtyData: (nodeId: string, callback: (data: string) => void) => () => void
   onPtyExit: (nodeId: string, callback: (exitCode: number) => void) => () => void
 
@@ -63,6 +99,12 @@ export interface ElectronAPI {
   readImageAsBase64: (imagePath: string) => Promise<string>
   readTextFile: (filePath: string) => Promise<string>
   onFileAdded: (nodeId: string, callback: (file: FileInfo) => void) => () => void
+
+  // Canvas save/load methods
+  saveCanvas: (filename: string, data: CanvasData) => Promise<void>
+  loadCanvas: (filename: string) => Promise<CanvasData | null>
+  listCanvases: () => Promise<SaveFileMetadata[]>
+  deleteCanvas: (filename: string) => Promise<void>
 }
 
 const electronAPI: ElectronAPI = {
@@ -77,6 +119,9 @@ const electronAPI: ElectronAPI = {
   },
   killPty: (nodeId) => {
     ipcRenderer.send(IPC_CHANNELS.PTY_KILL, nodeId)
+  },
+  getPtyCwd: (nodeId) => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PTY_GET_CWD, nodeId)
   },
   onPtyData: (nodeId, callback) => {
     dataCallbacks.set(nodeId, callback)
@@ -116,6 +161,20 @@ const electronAPI: ElectronAPI = {
       console.log('[Preload] Unregistering file added callback for nodeId:', nodeId)
       fileAddedCallbacks.delete(nodeId)
     }
+  },
+
+  // Canvas save/load methods
+  saveCanvas: (filename, data) => {
+    return ipcRenderer.invoke(IPC_CHANNELS.CANVAS_SAVE, filename, data)
+  },
+  loadCanvas: (filename) => {
+    return ipcRenderer.invoke(IPC_CHANNELS.CANVAS_LOAD, filename)
+  },
+  listCanvases: () => {
+    return ipcRenderer.invoke(IPC_CHANNELS.CANVAS_LIST)
+  },
+  deleteCanvas: (filename) => {
+    return ipcRenderer.invoke(IPC_CHANNELS.CANVAS_DELETE, filename)
   }
 }
 

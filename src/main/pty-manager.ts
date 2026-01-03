@@ -1,4 +1,5 @@
 import * as pty from 'node-pty'
+import { exec } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 
@@ -91,6 +92,37 @@ export class PtyManager {
       instance.pty.kill()
       this.ptys.delete(nodeId)
     }
+  }
+
+  async getCwd(nodeId: string): Promise<string | null> {
+    const instance = this.ptys.get(nodeId)
+    if (!instance) return null
+
+    const pid = instance.pty.pid
+
+    return new Promise((resolve) => {
+      if (process.platform === 'darwin') {
+        // macOS: Use lsof to get cwd
+        exec(`lsof -a -p ${pid} -d cwd -Fn`, (err, stdout) => {
+          if (err) {
+            resolve(null)
+            return
+          }
+          // Parse lsof output: lines starting with 'n' have the path
+          const lines = stdout.split('\n')
+          const cwdLine = lines.find(l => l.startsWith('n'))
+          resolve(cwdLine ? cwdLine.slice(1) : null)
+        })
+      } else if (process.platform === 'linux') {
+        // Linux: Read /proc/PID/cwd symlink
+        exec(`readlink /proc/${pid}/cwd`, (err, stdout) => {
+          resolve(err ? null : stdout.trim())
+        })
+      } else {
+        // Windows or unsupported platform
+        resolve(null)
+      }
+    })
   }
 
   killAll() {

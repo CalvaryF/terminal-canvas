@@ -1,21 +1,34 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { ReactFlowProvider, type Edge } from '@xyflow/react'
+import { ReactFlowProvider, useReactFlow, type Edge } from '@xyflow/react'
 import Canvas from './components/Canvas'
 import Toolbar from './components/Toolbar'
+import { FileMenu } from './components/FileMenu'
 import { FilePreviewModal, type PreviewContext } from './components/FilePreviewModal'
+import { useCanvasPersistence } from './hooks/useCanvasPersistence'
 import type { CanvasNode, TerminalNode, TextNode, FolderNode, FileInfo } from './types'
 
 export type CanvasMode = 'hand' | 'select' | 'draw'
 
 const DRAW_COLORS = ['#2c2c2c', '#ef4444']
 
-function App() {
+function AppContent() {
+  const { getViewport, setViewport } = useReactFlow()
   const [nodes, setNodes] = useState<CanvasNode[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [mode, setMode] = useState<CanvasMode>('hand')
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0])
   const [previewContext, setPreviewContext] = useState<PreviewContext>(null)
+
+  // Canvas persistence
+  const persistence = useCanvasPersistence({
+    nodes,
+    edges,
+    getViewport,
+    setNodes,
+    setEdges,
+    setViewport
+  })
 
   const addTerminal = useCallback((command: string) => {
     const id = crypto.randomUUID()
@@ -156,6 +169,16 @@ function App() {
         addFolder()
       }
 
+      // Save: Cmd+S (or Ctrl+S)
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          // Cmd+Shift+S - trigger save as (handled by FileMenu)
+        } else if (persistence.currentFile) {
+          persistence.save()
+        }
+      }
+
       // Delete selected nodes: Delete or Backspace
       if (e.code === 'Delete' || e.code === 'Backspace') {
         setNodes(nds => {
@@ -174,7 +197,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [addTerminal, addTextbox, addFolder, setNodes])
+  }, [addTerminal, addTextbox, addFolder, setNodes, persistence])
 
   // Build map of folder node connections for auto-copy pipeline
   const folderEdgeMap = useMemo(() => {
@@ -215,10 +238,20 @@ function App() {
   }, [])
 
   return (
-    <ReactFlowProvider>
-      <div className="app-container">
-        <div className="window-drag-bar" />
-        <Toolbar
+    <div className="app-container">
+      <div className="window-drag-bar">
+        <FileMenu
+          currentFile={persistence.currentFile}
+          isDirty={persistence.isDirty}
+          isSaving={persistence.isSaving}
+          saveFiles={persistence.saveFiles}
+          onSave={persistence.save}
+          onSaveAs={persistence.saveAs}
+          onLoad={persistence.load}
+          onNew={persistence.newCanvas}
+        />
+      </div>
+      <Toolbar
           onAddTerminal={addTerminal}
           onAddTextbox={addTextbox}
           onAddFolder={addFolder}
@@ -247,7 +280,14 @@ function App() {
           onClose={() => setPreviewContext(null)}
           onFileChange={handlePreviewFileChange}
         />
-      </div>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <ReactFlowProvider>
+      <AppContent />
     </ReactFlowProvider>
   )
 }

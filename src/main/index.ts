@@ -3,6 +3,7 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { ptyManager } from './pty-manager'
 import { fileManager } from './file-manager'
+import { canvasStorage, type CanvasData } from './canvas-storage'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 
 function createWindow() {
@@ -76,6 +77,28 @@ ipcMain.handle(IPC_CHANNELS.FOLDER_READ_IMAGE, (_, imagePath: string) => {
 
 ipcMain.handle(IPC_CHANNELS.FOLDER_READ_TEXT, (_, filePath: string) => {
   return fileManager.readTextFile(filePath)
+})
+
+// PTY get current working directory
+ipcMain.handle(IPC_CHANNELS.PTY_GET_CWD, (_, nodeId: string) => {
+  return ptyManager.getCwd(nodeId)
+})
+
+// Canvas save/load handlers
+ipcMain.handle(IPC_CHANNELS.CANVAS_SAVE, async (_, filename: string, data: CanvasData) => {
+  await canvasStorage.save(filename, data)
+})
+
+ipcMain.handle(IPC_CHANNELS.CANVAS_LOAD, async (_, filename: string) => {
+  return canvasStorage.load(filename)
+})
+
+ipcMain.handle(IPC_CHANNELS.CANVAS_LIST, async () => {
+  return canvasStorage.list()
+})
+
+ipcMain.handle(IPC_CHANNELS.CANVAS_DELETE, async (_, filename: string) => {
+  await canvasStorage.delete(filename)
 })
 
 // Register custom protocol for serving local files (avoids base64 encoding freeze)
