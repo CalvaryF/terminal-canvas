@@ -31,7 +31,7 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
   id,
   data
 }: FolderNodeComponentProps) {
-  const { onRemoveNode, mode, onFilePreview, onFolderFileAdded } = useCanvasContext()
+  const { mode, onFilePreview, onFolderFileAdded } = useCanvasContext()
   const isHandMode = mode === 'hand'
   const [files, setFiles] = useState<FileInfo[]>(data.files || [])
 
@@ -87,16 +87,10 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
     }
   }, [onFilePreview, files, folderName])
 
-  const handleClose = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onRemoveNode(id)
-  }
-
   return (
     <div className="folder-node">
       <div className="folder-header dragHandle">
         <span className="folder-title">📂 {folderName}</span>
-        <button className="folder-close" onClick={handleClose} />
       </div>
       <div className={`folder-body ${isHandMode ? '' : 'nodrag nowheel nopan'}`}>
         {files.length === 0 ? (
@@ -123,13 +117,13 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
         type="target"
         position={Position.Left}
         id="target"
-        className="folder-handle folder-handle-target"
+        className="node-handle"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="source"
-        className="folder-handle folder-handle-source"
+        className="node-handle"
       />
     </div>
   )

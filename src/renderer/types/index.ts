@@ -36,11 +36,24 @@ export interface FolderNodeData {
   isWatching: boolean
 }
 
+export interface CommandItem {
+  id: string
+  command: string
+  status: 'pending' | 'sent' | 'done' | 'error'
+  addedAt: number
+  sentAt?: number
+}
+
+export interface CommandQueueNodeData {
+  commands: CommandItem[]
+}
+
 export type TerminalNode = Node<TerminalNodeData, 'terminal'>
 export type TextNode = Node<TextNodeData, 'text'>
 export type DrawingNode = Node<DrawingNodeData, 'drawing'>
 export type FolderNode = Node<FolderNodeData, 'folder'>
-export type CanvasNode = TerminalNode | TextNode | DrawingNode | FolderNode
+export type CommandQueueNode = Node<CommandQueueNodeData, 'queue'>
+export type CanvasNode = TerminalNode | TextNode | DrawingNode | FolderNode | CommandQueueNode
 
 declare global {
   interface Window {

@@ -225,20 +225,29 @@ html, body, #root {
   background: transparent !important;
 }
 
-.react-flow__node-terminal {
+/* ============================================================
+   Shared Node Styles
+   ============================================================ */
+
+.react-flow__node-terminal,
+.react-flow__node-folder,
+.react-flow__node-queue {
   padding: 0;
   border-radius: 8px;
   background: transparent;
 }
 
-.terminal-node {
+/* Base node container */
+.terminal-node,
+.folder-node,
+.command-queue-node {
   display: flex;
   flex-direction: column;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid #a3a3a3;
-  /* Only transition visual properties, not layout-affecting ones */
+  background: #f0f0f0;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
@@ -247,7 +256,10 @@ html, body, #root {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-.terminal-header {
+/* Shared header styles */
+.terminal-header,
+.folder-header,
+.command-queue-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -257,30 +269,41 @@ html, body, #root {
   cursor: grab;
 }
 
-.terminal-header:active {
+.terminal-header:active,
+.folder-header:active,
+.command-queue-header:active {
   cursor: grabbing;
 }
 
-.terminal-title {
+/* Shared title styles */
+.terminal-title,
+.folder-title,
+.command-queue-title {
   font-size: 12px;
   font-weight: 500;
   color: #525252;
   user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.terminal-close {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ef4444;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.15s;
+/* Shared handle styles */
+.node-handle {
+  width: 8px;
+  height: 8px;
+  background: #d4d4d4;
+  border: 1px solid #a3a3a3;
 }
 
-.terminal-close:hover {
-  opacity: 0.8;
+.node-handle:hover {
+  background: #525252;
+  border-color: #525252;
 }
+
+/* ============================================================
+   Terminal Node
+   ============================================================ */
 
 .terminal-body {
   background: #f0f0f0;
@@ -348,54 +371,13 @@ html, body, #root {
   stroke-width: 2.5;
 }
 
-/* Folder Node */
+/* ============================================================
+   Folder Node
+   ============================================================ */
+
 .folder-node {
   min-width: 220px;
   max-width: 300px;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-}
-
-.folder-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e5e5;
-  cursor: grab;
-}
-
-.folder-header:active {
-  cursor: grabbing;
-}
-
-.folder-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: #525252;
-  user-select: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.folder-close {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ef4444;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  flex-shrink: 0;
-}
-
-.folder-close:hover {
-  opacity: 0.8;
 }
 
 .folder-body {
@@ -431,7 +413,7 @@ html, body, #root {
 }
 
 .file-item.clickable:hover {
-  background: #f5f5f5;
+  background: #e5e5e5;
 }
 
 .file-icon {
@@ -443,23 +425,6 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Folder Node Handles */
-.folder-handle {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.folder-handle-source {
-  background: #3b82f6;
-  border: 2px solid #fff;
-}
-
-.folder-handle-target {
-  background: #10b981;
-  border: 2px solid #fff;
 }
 
 /* File Preview Modal */
@@ -967,4 +932,182 @@ html, body, #root {
 .file-menu-dialog-button.save:disabled {
   background: #a3a3a3;
   cursor: default;
+}
+
+/* ============================================================
+   Command Queue Node
+   ============================================================ */
+
+.command-queue-node {
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.command-queue-add-btn {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #a3a3a3;
+  border-radius: 4px;
+  background: #fff;
+  color: #525252;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.command-queue-add-btn:hover {
+  background: #e5e5e5;
+  border-color: #525252;
+}
+
+.command-queue-body {
+  padding: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.command-queue-empty {
+  padding: 16px;
+  text-align: center;
+  color: #a3a3a3;
+  font-size: 12px;
+}
+
+.command-input-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.command-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #a3a3a3;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  background: #fff;
+  outline: none;
+}
+
+.command-input:focus {
+  border-color: #525252;
+}
+
+.command-input-submit {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #a3a3a3;
+  border-radius: 4px;
+  background: #fff;
+  color: #525252;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.command-input-submit:hover:not(:disabled) {
+  background: #e5e5e5;
+  border-color: #525252;
+}
+
+.command-input-submit:disabled {
+  background: #f5f5f5;
+  color: #a3a3a3;
+  border-color: #d4d4d4;
+  cursor: default;
+}
+
+.command-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.command-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #525252;
+  gap: 8px;
+}
+
+.command-item:hover {
+  background: #e5e5e5;
+}
+
+.command-status-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: #a3a3a3;
+}
+
+.command-text {
+  flex: 1;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.command-item:hover .command-actions {
+  opacity: 1;
+}
+
+.command-send-btn,
+.command-remove-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #a3a3a3;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #525252;
+}
+
+.command-send-btn:hover {
+  background: #e5e5e5;
+  border-color: #525252;
+}
+
+.command-remove-btn:hover {
+  background: #fecaca;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Command Status Colors */
+.command-status-pending .command-status-icon {
+  color: #a3a3a3;
+}
+
+.command-status-sent .command-status-icon {
+  color: #525252;
+}
+
+.command-status-done .command-status-icon {
+  color: #525252;
+}
+
+.command-status-error .command-status-icon {
+  color: #ef4444;
 }

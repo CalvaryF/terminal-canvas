@@ -22,8 +22,9 @@ import TerminalNode from './TerminalNode'
 import TextNode from './TextNode'
 import DrawingNode from './DrawingNode'
 import FolderNode from './FolderNode'
+import CommandQueueNode from './CommandQueueNode'
 import CustomEdge from './CustomEdge'
-import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType, FileInfo } from '../types'
+import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType, FileInfo, CommandItem } from '../types'
 import type { CanvasMode } from '../App'
 import type { PreviewContext } from './FilePreviewModal'
 import { pointsToSVGPath, getBoundingBox, normalizePoints, smoothPoints, type Point } from '../utils/pathSmoothing'
@@ -65,6 +66,7 @@ interface CanvasContextType {
   setIsZoomActive: (active: boolean) => void
   onFilePreview: ((context: PreviewContext) => void) | null
   onFolderFileAdded: ((nodeId: string, filePath: string) => void) | null
+  onSendCommand: ((queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void) | null
 }
 
 export const CanvasContext = createContext<CanvasContextType>({
@@ -75,7 +77,8 @@ export const CanvasContext = createContext<CanvasContextType>({
   isZoomActive: false,
   setIsZoomActive: () => {},
   onFilePreview: null,
-  onFolderFileAdded: null
+  onFolderFileAdded: null,
+  onSendCommand: null
 })
 
 export const useCanvasContext = () => useContext(CanvasContext)
@@ -84,7 +87,8 @@ const nodeTypes: NodeTypes = {
   terminal: TerminalNode,
   text: TextNode,
   drawing: DrawingNode,
-  folder: FolderNode
+  folder: FolderNode,
+  queue: CommandQueueNode
 }
 
 const edgeTypes = {
@@ -105,6 +109,7 @@ interface CanvasProps {
   onFolderFileAdded: (nodeId: string, filePath: string) => void
   onAddFolderAtPosition: (folderPath: string, x: number, y: number) => void
   onDuplicateNodes: (nodes: CanvasNode[]) => void
+  onSendCommand: (queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void
 }
 
 function ZoomHandler() {
@@ -547,7 +552,7 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
   )
 }
 
-function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes }: CanvasProps) {
+function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes, onSendCommand }: CanvasProps) {
   const [isZoomActive, setIsZoomActive] = useState(false)
   const { screenToFlowPosition } = useReactFlow()
   const duplicatedRef = useRef(false)
@@ -726,8 +731,8 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
   }, [nodes, setEdges])
 
   const contextValue = useMemo(
-    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded }),
-    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded]
+    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded, onSendCommand }),
+    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded, onSendCommand]
   )
 
   return (

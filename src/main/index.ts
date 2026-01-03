@@ -4,6 +4,7 @@ import { pathToFileURL } from 'url'
 import { ptyManager } from './pty-manager'
 import { fileManager } from './file-manager'
 import { canvasStorage, type CanvasData } from './canvas-storage'
+import { agentServer } from './agent-server'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 
 function createWindow() {
@@ -24,6 +25,9 @@ function createWindow() {
 
   ptyManager.setWindow(mainWindow)
   fileManager.setWindow(mainWindow)
+
+  // Initialize agent API server (if enabled via AGENT_API_ENABLED env var)
+  agentServer.initialize(mainWindow)
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
@@ -130,6 +134,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  agentServer.close()
   ptyManager.killAll()
   fileManager.unwatchAll()
 })

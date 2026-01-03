@@ -10,7 +10,7 @@ export interface CanvasViewport {
 
 export interface CanvasNodeData {
   id: string
-  type: 'terminal' | 'text' | 'drawing' | 'folder'
+  type: 'terminal' | 'text' | 'drawing' | 'folder' | 'queue'
   position: { x: number; y: number }
   data: Record<string, unknown>
 }

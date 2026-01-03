@@ -2,6 +2,7 @@ import * as pty from 'node-pty'
 import { exec } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { agentWsManager } from './agent-ws'
 
 // OSC 10 = foreground color query, OSC 11 = background color query
 // Query formats: \x1b]11;?\x07 (BEL) or \x1b]11;?\x1b\\ (ST)
@@ -13,6 +14,9 @@ const OSC_11_QUERY = /\x1b\]11;?\?(\x07|\x1b\\)/g
 const FOREGROUND_COLOR = 'rgb:2c2c/2c2c/2c2c'  // #2c2c2c
 const BACKGROUND_COLOR = 'rgb:f0f0/f0f0/f0f0'  // #f0f0f0
 
+// Output buffer configuration
+const MAX_BUFFER_LINES = 1000
+
 interface PtyInstance {
   pty: pty.IPty
   nodeId: string
@@ -21,9 +25,43 @@ interface PtyInstance {
 export class PtyManager {
   private ptys: Map<string, PtyInstance> = new Map()
   private window: BrowserWindow | null = null
+  private outputBuffers: Map<string, string[]> = new Map()
 
   setWindow(window: BrowserWindow) {
     this.window = window
+  }
+
+  private appendToBuffer(nodeId: string, data: string) {
+    let buffer = this.outputBuffers.get(nodeId)
+    if (!buffer) {
+      buffer = []
+      this.outputBuffers.set(nodeId, buffer)
+    }
+
+    // Split data into lines and append
+    const lines = data.split('\n')
+    for (const line of lines) {
+      if (line) {
+        buffer.push(line)
+      }
+    }
+
+    // Trim buffer if over limit
+    while (buffer.length > MAX_BUFFER_LINES) {
+      buffer.shift()
+    }
+  }
+
+  getOutput(nodeId: string, lineCount?: number): string[] {
+    const buffer = this.outputBuffers.get(nodeId) || []
+    if (lineCount && lineCount > 0) {
+      return buffer.slice(-lineCount)
+    }
+    return [...buffer]
+  }
+
+  clearOutput(nodeId: string) {
+    this.outputBuffers.delete(nodeId)
   }
 
   create(nodeId: string, command: string, cwd: string, cols: number, rows: number): string {
@@ -56,12 +94,21 @@ export class PtyManager {
         OSC_11_QUERY.lastIndex = 0
       }
 
+      // Buffer output for agent API
+      this.appendToBuffer(nodeId, data)
+
+      // Notify WebSocket subscribers
+      agentWsManager.notifyTerminalOutput(nodeId, data)
+
       if (this.window && !this.window.isDestroyed()) {
         this.window.webContents.send(IPC_CHANNELS.PTY_DATA, nodeId, data)
       }
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      // Notify WebSocket subscribers
+      agentWsManager.notifyTerminalExit(nodeId, exitCode)
+
       if (this.window && !this.window.isDestroyed()) {
         this.window.webContents.send(IPC_CHANNELS.PTY_EXIT, nodeId, exitCode)
       }
@@ -91,6 +138,7 @@ export class PtyManager {
     if (instance) {
       instance.pty.kill()
       this.ptys.delete(nodeId)
+      this.outputBuffers.delete(nodeId)
     }
   }
 

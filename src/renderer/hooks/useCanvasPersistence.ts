@@ -231,6 +231,16 @@ export function useCanvasPersistence(options: UseCanvasPersistenceOptions) {
           }
         }
 
+        if (node.type === 'queue') {
+          return {
+            id: newId,
+            type: 'queue' as const,
+            position: node.position,
+            dragHandle: '.dragHandle',
+            data: node.data as CanvasNode['data']
+          }
+        }
+
         // Text node
         return {
           id: newId,

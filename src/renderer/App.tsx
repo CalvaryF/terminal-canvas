@@ -5,7 +5,8 @@ import Toolbar from './components/Toolbar'
 import { FileMenu } from './components/FileMenu'
 import { FilePreviewModal, type PreviewContext } from './components/FilePreviewModal'
 import { useCanvasPersistence } from './hooks/useCanvasPersistence'
-import type { CanvasNode, TerminalNode, TextNode, FolderNode, FileInfo } from './types'
+import { useAgentHandler } from './hooks/useAgentHandler'
+import type { CanvasNode, TerminalNode, TextNode, FolderNode, FileInfo, CommandQueueNode, CommandItem } from './types'
 
 export type CanvasMode = 'hand' | 'select' | 'draw'
 
@@ -29,6 +30,18 @@ function AppContent() {
     setNodes,
     setEdges,
     setViewport
+  })
+
+  // Agent API handler - allows external control via HTTP/WebSocket
+  useAgentHandler({
+    nodes,
+    edges,
+    getViewport,
+    setNodes,
+    setEdges,
+    setViewport,
+    setFocusedNodeId,
+    mode
   })
 
   const addTerminal = useCallback((command: string) => {
@@ -117,6 +130,25 @@ function AppContent() {
     setNodes((nds) => [...nds, newNode])
     setMode('select')
   }, [])
+
+  const addCommandQueue = useCallback(() => {
+    const id = crypto.randomUUID()
+    const nodeCount = nodes.length
+    const newNode: CommandQueueNode = {
+      id,
+      type: 'queue',
+      position: {
+        x: 150 + (nodeCount % 4) * 280,
+        y: 150 + Math.floor(nodeCount / 4) * 250
+      },
+      dragHandle: '.dragHandle',
+      data: {
+        commands: []
+      }
+    }
+    setNodes((nds) => [...nds, newNode])
+    setMode('select')
+  }, [nodes.length])
 
   const removeNode = useCallback((nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId)
@@ -253,6 +285,86 @@ function AppContent() {
     return map
   }, [edges, nodes])
 
+  // Build map of queue -> terminal connections
+  const queueTerminalMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const edge of edges) {
+      const sourceNode = nodes.find(n => n.id === edge.source)
+      const targetNode = nodes.find(n => n.id === edge.target)
+      if (sourceNode?.type === 'queue' && targetNode?.type === 'terminal') {
+        map.set(edge.source, edge.target)
+      }
+    }
+    return map
+  }, [edges, nodes])
+
+  // Handle command queue actions (add, send, remove)
+  const handleSendCommand = useCallback((queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => {
+    if (action === 'add') {
+      // Add a new command to the queue
+      const command = payload as CommandItem
+      setNodes(nds => nds.map(n => {
+        if (n.id !== queueId || n.type !== 'queue') return n
+        const queueNode = n as CommandQueueNode
+        return {
+          ...queueNode,
+          data: {
+            ...queueNode.data,
+            commands: [...queueNode.data.commands, command]
+          }
+        }
+      }))
+    } else if (action === 'send') {
+      // Send a command to the connected terminal
+      const commandId = payload as string
+      const terminalId = queueTerminalMap.get(queueId)
+
+      if (!terminalId) {
+        console.warn('[App] No terminal connected to queue:', queueId)
+        return
+      }
+
+      // Find the command
+      const queueNode = nodes.find(n => n.id === queueId && n.type === 'queue') as CommandQueueNode | undefined
+      const command = queueNode?.data.commands.find(c => c.id === commandId)
+
+      if (!command) {
+        console.warn('[App] Command not found:', commandId)
+        return
+      }
+
+      // Send to terminal
+      window.electronAPI.writePty(terminalId, command.command + '\n')
+
+      // Remove command from queue after sending
+      setNodes(nds => nds.map(n => {
+        if (n.id !== queueId || n.type !== 'queue') return n
+        const qNode = n as CommandQueueNode
+        return {
+          ...qNode,
+          data: {
+            ...qNode.data,
+            commands: qNode.data.commands.filter(c => c.id !== commandId)
+          }
+        }
+      }))
+    } else if (action === 'remove') {
+      // Remove a pending command from the queue
+      const commandId = payload as string
+      setNodes(nds => nds.map(n => {
+        if (n.id !== queueId || n.type !== 'queue') return n
+        const queueNode = n as CommandQueueNode
+        return {
+          ...queueNode,
+          data: {
+            ...queueNode.data,
+            commands: queueNode.data.commands.filter(c => c.id !== commandId)
+          }
+        }
+      }))
+    }
+  }, [queueTerminalMap, nodes])
+
   // Handle file added in folder - copy to connected folders
   const handleFolderFileAdded = useCallback((sourceNodeId: string, filePath: string) => {
     console.log('[App] File added in folder:', sourceNodeId, filePath)
@@ -308,6 +420,7 @@ function AppContent() {
           onAddTerminal={addTerminal}
           onAddTextbox={addTextbox}
           onAddFolder={addFolder}
+          onAddCommandQueue={addCommandQueue}
           mode={mode}
           onModeChange={setMode}
           drawColor={drawColor}
@@ -328,6 +441,7 @@ function AppContent() {
           onFolderFileAdded={handleFolderFileAdded}
           onAddFolderAtPosition={addFolderAtPosition}
           onDuplicateNodes={handleDuplicateNodes}
+          onSendCommand={handleSendCommand}
         />
         <FilePreviewModal
           context={previewContext}

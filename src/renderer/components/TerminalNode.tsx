@@ -11,7 +11,7 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   id,
   data
 }: TerminalNodeComponentProps) {
-  const { focusedNodeId, setFocusedNodeId, onRemoveNode, mode } = useCanvasContext()
+  const { focusedNodeId, setFocusedNodeId, mode } = useCanvasContext()
   const isFocused = focusedNodeId === id
   const isHandMode = mode === 'hand'
 
@@ -203,18 +203,12 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
     }
   }
 
-  const handleClose = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onRemoveNode(id)
-  }
-
   return (
     <div
       className={`terminal-node ${isFocused ? 'focused' : ''}`}
     >
       <div className="terminal-header dragHandle">
         <span className="terminal-title">{data.title}</span>
-        <button className="terminal-close" onClick={handleClose} />
       </div>
       <div
         className={`terminal-body ${isHandMode ? '' : 'nodrag nowheel'}`}
@@ -229,7 +223,7 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
         }}
       />
       <Handle type="source" position={Position.Right} style={{ visibility: 'hidden' }} />
-      <Handle type="target" position={Position.Left} style={{ visibility: 'hidden' }} />
+      <Handle type="target" position={Position.Left} id="command-input" className="node-handle" />
     </div>
   )
 })
