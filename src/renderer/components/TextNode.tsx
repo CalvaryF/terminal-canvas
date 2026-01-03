@@ -58,8 +58,8 @@ const TextNodeComponent = memo(function TextNodeComponent({
           {text}
         </div>
       )}
-      <Handle type="source" position={Position.Right} style={{ visibility: 'hidden' }} />
-      <Handle type="target" position={Position.Left} style={{ visibility: 'hidden' }} />
+      <Handle type="target" position={Position.Left} className="text-node-handle" />
+      <Handle type="source" position={Position.Right} className="text-node-handle" />
     </div>
   )
 })

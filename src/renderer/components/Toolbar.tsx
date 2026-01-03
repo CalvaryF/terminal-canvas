@@ -3,11 +3,15 @@ import type { CanvasMode } from '../App'
 interface ToolbarProps {
   onAddTerminal: (command: string) => void
   onAddTextbox: () => void
+  onAddFolder: () => void
   mode: CanvasMode
   onModeChange: (mode: CanvasMode) => void
+  drawColor: string
+  onDrawColorChange: (color: string) => void
+  drawColors: string[]
 }
 
-function Toolbar({ onAddTerminal, onAddTextbox, mode, onModeChange }: ToolbarProps) {
+function Toolbar({ onAddTerminal, onAddTextbox, onAddFolder, mode, onModeChange, drawColor, onDrawColorChange, drawColors }: ToolbarProps) {
   return (
     <div className="bottom-toolbar">
       <button
@@ -32,6 +36,29 @@ function Toolbar({ onAddTerminal, onAddTextbox, mode, onModeChange }: ToolbarPro
           <path d="M13 13l6 6"></path>
         </svg>
       </button>
+      <button
+        onClick={() => onModeChange('draw')}
+        title="Pencil tool (P)"
+        className={mode === 'draw' ? 'active' : ''}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+          <path d="m15 5 4 4"></path>
+        </svg>
+      </button>
+      {mode === 'draw' && (
+        <div className="color-picker">
+          {drawColors.map(color => (
+            <button
+              key={color}
+              className={`color-dot ${color === drawColor ? 'active' : ''}`}
+              style={{ '--dot-color': color } as React.CSSProperties}
+              onClick={() => onDrawColorChange(color)}
+              title={color}
+            />
+          ))}
+        </div>
+      )}
       <div className="toolbar-divider" />
       <button onClick={() => onAddTerminal('')} title="Add Shell">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -50,6 +77,11 @@ function Toolbar({ onAddTerminal, onAddTextbox, mode, onModeChange }: ToolbarPro
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
           <path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.375-9.375z"></path>
+        </svg>
+      </button>
+      <button onClick={onAddFolder} title="Add Folder">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
         </svg>
       </button>
     </div>

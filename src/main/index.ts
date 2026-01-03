@@ -1,12 +1,18 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { ptyManager } from './pty-manager'
+import { fileManager } from './file-manager'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    transparent: true,
+    backgroundColor: '#00000000',
+    titleBarStyle: 'hiddenInset',
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -15,6 +21,7 @@ function createWindow() {
   })
 
   ptyManager.setWindow(mainWindow)
+  fileManager.setWindow(mainWindow)
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
@@ -41,6 +48,35 @@ ipcMain.on(IPC_CHANNELS.PTY_KILL, (_, nodeId: string) => {
   ptyManager.kill(nodeId)
 })
 
+// Folder IPC Handlers
+ipcMain.handle(IPC_CHANNELS.FOLDER_SELECT, () => {
+  return fileManager.selectFolder()
+})
+
+ipcMain.handle(IPC_CHANNELS.FOLDER_LIST, (_, folderPath: string) => {
+  return fileManager.listFolder(folderPath)
+})
+
+ipcMain.handle(IPC_CHANNELS.FOLDER_WATCH, (_, nodeId: string, folderPath: string) => {
+  fileManager.watchFolder(nodeId, folderPath)
+})
+
+ipcMain.on(IPC_CHANNELS.FOLDER_UNWATCH, (_, nodeId: string) => {
+  fileManager.unwatchFolder(nodeId)
+})
+
+ipcMain.handle(IPC_CHANNELS.FOLDER_COPY, (_, sourcePath: string, targetPath: string) => {
+  return fileManager.copyFile(sourcePath, targetPath)
+})
+
+ipcMain.handle(IPC_CHANNELS.FOLDER_READ_IMAGE, (_, imagePath: string) => {
+  return fileManager.readImageAsBase64(imagePath)
+})
+
+ipcMain.handle(IPC_CHANNELS.FOLDER_READ_TEXT, (_, filePath: string) => {
+  return fileManager.readTextFile(filePath)
+})
+
 app.whenReady().then(() => {
   createWindow()
 
@@ -60,4 +96,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   ptyManager.killAll()
+  fileManager.unwatchAll()
 })

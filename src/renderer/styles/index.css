@@ -9,7 +9,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fafafa;
+  background: transparent;
 }
 
 .app-container {
@@ -17,6 +17,17 @@ html, body, #root {
   flex-direction: column;
   width: 100%;
   height: 100%;
+  background: transparent;
+}
+
+.window-drag-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  -webkit-app-region: drag;
+  z-index: 9999;
 }
 
 .bottom-toolbar {
@@ -66,11 +77,96 @@ html, body, #root {
   margin: 0 4px;
 }
 
+/* Color picker */
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.color-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-dot:hover {
+  background: #f5f5f5;
+}
+
+.color-dot.active {
+  background: #e5e5e5;
+}
+
+.color-dot::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background-color: var(--dot-color);
+}
+
+/* Mode cursors */
+.canvas-container.hand-mode .react-flow__pane {
+  cursor: grab;
+}
+
+.canvas-container.select-mode .react-flow__pane {
+  cursor: default;
+}
+
+.canvas-container.draw-mode,
+.canvas-container.draw-mode .react-flow__pane {
+  cursor: crosshair;
+}
+
+/* Drawing node */
+.react-flow__node-drawing {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.react-flow__node-drawing.selected,
+.react-flow__node-drawing.selected:focus,
+.react-flow__node-drawing.selected:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+.react-flow__node-drawing.selected .react-flow__handle {
+  display: none;
+}
+
+/* Hide React Flow's default selection styling for drawings */
+.react-flow__node-drawing .react-flow__node-selection-rect,
+.react-flow__node-drawing::before,
+.react-flow__node-drawing::after {
+  display: none !important;
+}
+
+/* Hide React Flow's selection box/nodesSelectionbox */
+.react-flow__nodesselection-rect {
+  background: transparent !important;
+  border: none !important;
+}
+
 /* Text Node */
 .text-node {
-  min-width: 120px;
-  min-height: 40px;
-  padding: 12px 16px;
+  min-width: 200px;
+  min-height: 80px;
+  padding: 16px;
   background: #fff;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
@@ -91,20 +187,39 @@ html, body, #root {
 
 .text-node-input {
   width: 100%;
-  min-width: 200px;
-  min-height: 60px;
+  height: 100%;
+  min-height: 48px;
   border: none;
   outline: none;
-  resize: both;
+  resize: none;
   font-family: inherit;
   font-size: 14px;
   color: #2c2c2c;
   background: transparent;
 }
 
+/* Text Node Handles */
+.text-node-handle {
+  width: 8px;
+  height: 8px;
+  background: #d4d4d4;
+  border: 1px solid #a3a3a3;
+}
+
+.text-node-handle:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
 .canvas-container {
   flex: 1;
   width: 100%;
+  padding-top: 28px; /* Space for hidden title bar */
+}
+
+/* Make React Flow background transparent */
+.react-flow__pane {
+  background: transparent !important;
 }
 
 .react-flow__node-terminal {
@@ -119,13 +234,13 @@ html, body, #root {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e5e5;
+  border: 1px solid #a3a3a3;
   /* Only transition visual properties, not layout-affecting ones */
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
 .terminal-node.focused {
-  border-color: #a3a3a3;
+  border-color: #525252;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -218,4 +333,326 @@ html, body, #root {
 
 .react-flow__minimap-mask {
   fill: rgba(0, 0, 0, 0.05);
+}
+
+/* Edges (connectors) */
+.react-flow__edge-path {
+  stroke: #2c2c2c;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #0a0a0a;
+}
+
+/* Folder Node */
+.folder-node {
+  min-width: 220px;
+  max-width: 300px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.folder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e5e5;
+  cursor: grab;
+}
+
+.folder-header:active {
+  cursor: grabbing;
+}
+
+.folder-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #525252;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-close {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.folder-close:hover {
+  opacity: 0.8;
+}
+
+.folder-body {
+  padding: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.folder-empty {
+  padding: 16px;
+  text-align: center;
+  color: #a3a3a3;
+  font-size: 12px;
+}
+
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #525252;
+}
+
+.file-item.clickable {
+  cursor: pointer;
+}
+
+.file-item.clickable:hover {
+  background: #f5f5f5;
+}
+
+.file-icon {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Folder Node Handles */
+.folder-handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.folder-handle-source {
+  background: #3b82f6;
+  border: 2px solid #fff;
+}
+
+.folder-handle-target {
+  background: #10b981;
+  border: 2px solid #fff;
+}
+
+/* File Preview Modal */
+.file-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.file-preview-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.file-preview-container:not(.text-preview) {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #a3a3a3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: #f0f0f0;
+}
+
+.file-preview-container img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  display: block;
+}
+
+.file-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.file-preview-filename {
+  font-size: 12px;
+  font-weight: 500;
+  color: #525252;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview-close {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.file-preview-close:hover {
+  opacity: 0.8;
+}
+
+.file-preview-container.text-preview {
+  width: 80vw;
+  max-width: 900px;
+  border-radius: 8px;
+  overflow: hidden;
+  align-items: stretch;
+  border: 1px solid #a3a3a3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.file-preview-code {
+  margin: 0;
+  padding: 8px;
+  background: #f0f0f0;
+  overflow: auto;
+  min-height: 424px;
+  max-height: 70vh;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #2c2c2c;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.file-preview-code::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.file-preview-code::-webkit-scrollbar-track {
+  background: #e5e5e5;
+}
+
+.file-preview-code::-webkit-scrollbar-thumb {
+  background: #d3d3d3;
+  border-radius: 4px;
+}
+
+.file-preview-code::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+.file-preview-loading {
+  padding: 32px;
+  color: #525252;
+  font-size: 14px;
+  background: #f0f0f0;
+}
+
+/* Syntax highlighting - Mountaineer Light theme */
+.file-preview-code .hljs-keyword,
+.file-preview-code .hljs-selector-tag,
+.file-preview-code .hljs-built_in,
+.file-preview-code .hljs-name,
+.file-preview-code .hljs-tag {
+  color: #5F5B73;
+}
+
+.file-preview-code .hljs-string,
+.file-preview-code .hljs-title,
+.file-preview-code .hljs-section,
+.file-preview-code .hljs-attribute,
+.file-preview-code .hljs-literal,
+.file-preview-code .hljs-template-tag,
+.file-preview-code .hljs-template-variable,
+.file-preview-code .hljs-type {
+  color: #5B735C;
+}
+
+.file-preview-code .hljs-number,
+.file-preview-code .hljs-symbol,
+.file-preview-code .hljs-bullet,
+.file-preview-code .hljs-link {
+  color: #735B60;
+}
+
+.file-preview-code .hljs-comment,
+.file-preview-code .hljs-quote {
+  color: #a2a2a2;
+  font-style: italic;
+}
+
+.file-preview-code .hljs-meta,
+.file-preview-code .hljs-meta-keyword {
+  color: #73705B;
+}
+
+.file-preview-code .hljs-function,
+.file-preview-code .hljs-title.function_ {
+  color: #5B7273;
+}
+
+.file-preview-code .hljs-variable,
+.file-preview-code .hljs-attr {
+  color: #735B73;
+}
+
+.file-preview-code .hljs-regexp,
+.file-preview-code .hljs-selector-attr,
+.file-preview-code .hljs-selector-pseudo {
+  color: #5B7273;
+}
+
+.file-preview-code .hljs-deletion {
+  background-color: #fdd;
+  color: #735B60;
+}
+
+.file-preview-code .hljs-addition {
+  background-color: #dfd;
+  color: #5B735C;
+}
+
+.file-preview-code .hljs-emphasis {
+  font-style: italic;
+}
+
+.file-preview-code .hljs-strong {
+  font-weight: bold;
 }

@@ -11,8 +11,9 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   id,
   data
 }: TerminalNodeComponentProps) {
-  const { focusedNodeId, setFocusedNodeId, onRemoveNode } = useCanvasContext()
+  const { focusedNodeId, setFocusedNodeId, onRemoveNode, mode } = useCanvasContext()
   const isFocused = focusedNodeId === id
+  const isHandMode = mode === 'hand'
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -160,6 +161,9 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   }, [isFocused])
 
   const handleTerminalClick = (e: React.MouseEvent) => {
+    // In hand mode, don't capture events - let React Flow handle panning
+    if (isHandMode) return
+
     e.stopPropagation()
     // Don't focus terminal when in zoom mode (z key held)
     if (zoomModeRef.current) return
@@ -213,14 +217,15 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
         <button className="terminal-close" onClick={handleClose} />
       </div>
       <div
-        className="terminal-body nodrag nowheel"
+        className={`terminal-body ${isHandMode ? '' : 'nodrag nowheel'}`}
         ref={terminalRef}
         onClick={handleTerminalClick}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         style={{
           width: data.cols * 8 + 16,
-          height: data.rows * 17 + 16
+          height: data.rows * 17 + 16,
+          pointerEvents: isHandMode ? 'none' : 'auto'
         }}
       />
       <Handle type="source" position={Position.Right} style={{ visibility: 'hidden' }} />
