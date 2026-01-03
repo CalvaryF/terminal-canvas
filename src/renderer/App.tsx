@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { ReactFlowProvider, useReactFlow, type Edge } from '@xyflow/react'
 import Canvas from './components/Canvas'
 import Toolbar from './components/Toolbar'
@@ -19,6 +19,7 @@ function AppContent() {
   const [mode, setMode] = useState<CanvasMode>('hand')
   const [drawColor, setDrawColor] = useState<string>(DRAW_COLORS[0])
   const [previewContext, setPreviewContext] = useState<PreviewContext>(null)
+  const clipboardRef = useRef<CanvasNode[]>([])
 
   // Canvas persistence
   const persistence = useCanvasPersistence({
@@ -141,6 +142,9 @@ function AppContent() {
       // Mode switching: h = hand (pan), v = select (move nodes), p = draw (pencil)
       if (e.code === 'KeyH') {
         setMode('hand')
+        // Clear all selections in hand mode
+        setNodes(nds => nds.map(n => ({ ...n, selected: false })))
+        setEdges(eds => eds.map(e => ({ ...e, selected: false })))
       } else if (e.code === 'KeyV') {
         setMode('select')
       } else if (e.code === 'KeyP') {
@@ -179,7 +183,41 @@ function AppContent() {
         }
       }
 
-      // Delete selected nodes: Delete or Backspace
+      // Copy: Cmd+C
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
+        const selectedNodes = nodes.filter(n => n.selected)
+        if (selectedNodes.length > 0) {
+          e.preventDefault()
+          clipboardRef.current = selectedNodes.map(n => ({ ...n }))
+        }
+      }
+
+      // Paste: Cmd+V
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyV') {
+        if (clipboardRef.current.length > 0) {
+          e.preventDefault()
+          const offset = 50
+          const newNodes = clipboardRef.current.map(n => ({
+            ...n,
+            id: crypto.randomUUID(),
+            position: { x: n.position.x + offset, y: n.position.y + offset },
+            selected: true,
+            // Reset terminal/folder specific state
+            ...(n.type === 'terminal' ? { data: { ...n.data, cwd: '' } } : {}),
+            ...(n.type === 'folder' ? { data: { ...n.data, files: [], isWatching: true } } : {})
+          })) as CanvasNode[]
+
+          // Deselect old nodes, add new ones
+          setNodes(nds => [
+            ...nds.map(n => ({ ...n, selected: false })),
+            ...newNodes
+          ])
+          // Update clipboard to new nodes for repeated paste
+          clipboardRef.current = newNodes.map(n => ({ ...n }))
+        }
+      }
+
+      // Delete selected nodes and edges: Delete or Backspace
       if (e.code === 'Delete' || e.code === 'Backspace') {
         setNodes(nds => {
           const selectedNodes = nds.filter(n => n.selected)
@@ -192,12 +230,13 @@ function AppContent() {
           })
           return nds.filter(n => !n.selected)
         })
+        setEdges(eds => eds.filter(e => !e.selected))
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [addTerminal, addTextbox, addFolder, setNodes, persistence])
+  }, [addTerminal, addTextbox, addFolder, setNodes, persistence, nodes])
 
   // Build map of folder node connections for auto-copy pipeline
   const folderEdgeMap = useMemo(() => {
@@ -237,6 +276,20 @@ function AppContent() {
     setPreviewContext(prev => prev ? { ...prev, file } : null)
   }, [])
 
+  // Handle option+drag duplication
+  const handleDuplicateNodes = useCallback((nodesToDuplicate: CanvasNode[]) => {
+    const newNodes = nodesToDuplicate.map(n => ({
+      ...n,
+      id: crypto.randomUUID(),
+      selected: false,
+      // Reset terminal/folder specific state
+      ...(n.type === 'terminal' ? { data: { ...n.data, cwd: '' } } : {}),
+      ...(n.type === 'folder' ? { data: { ...n.data, files: [], isWatching: true } } : {})
+    })) as CanvasNode[]
+
+    setNodes(nds => [...nds, ...newNodes])
+  }, [setNodes])
+
   return (
     <div className="app-container">
       <div className="window-drag-bar">
@@ -274,6 +327,7 @@ function AppContent() {
           onFilePreview={setPreviewContext}
           onFolderFileAdded={handleFolderFileAdded}
           onAddFolderAtPosition={addFolderAtPosition}
+          onDuplicateNodes={handleDuplicateNodes}
         />
         <FilePreviewModal
           context={previewContext}

@@ -22,10 +22,39 @@ import TerminalNode from './TerminalNode'
 import TextNode from './TextNode'
 import DrawingNode from './DrawingNode'
 import FolderNode from './FolderNode'
+import CustomEdge from './CustomEdge'
 import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType, FileInfo } from '../types'
 import type { CanvasMode } from '../App'
 import type { PreviewContext } from './FilePreviewModal'
 import { pointsToSVGPath, getBoundingBox, normalizePoints, smoothPoints, type Point } from '../utils/pathSmoothing'
+
+// Check if a line segment intersects with a rectangle
+function lineIntersectsRect(
+  x1: number, y1: number, x2: number, y2: number,
+  left: number, top: number, right: number, bottom: number
+): boolean {
+  // Check if either endpoint is inside the rectangle
+  if ((x1 >= left && x1 <= right && y1 >= top && y1 <= bottom) ||
+      (x2 >= left && x2 <= right && y2 >= top && y2 <= bottom)) {
+    return true
+  }
+
+  // Check if line intersects any of the rectangle's edges
+  const intersectsLine = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number) => {
+    const denom = (dy - cy) * (bx - ax) - (dx - cx) * (by - ay)
+    if (Math.abs(denom) < 0.0001) return false
+    const ua = ((dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)) / denom
+    const ub = ((bx - ax) * (ay - cy) - (by - ay) * (ax - cx)) / denom
+    return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1
+  }
+
+  return (
+    intersectsLine(x1, y1, x2, y2, left, top, right, top) ||     // Top edge
+    intersectsLine(x1, y1, x2, y2, right, top, right, bottom) || // Right edge
+    intersectsLine(x1, y1, x2, y2, left, bottom, right, bottom) || // Bottom edge
+    intersectsLine(x1, y1, x2, y2, left, top, left, bottom)      // Left edge
+  )
+}
 
 interface CanvasContextType {
   focusedNodeId: string | null
@@ -58,6 +87,10 @@ const nodeTypes: NodeTypes = {
   folder: FolderNode
 }
 
+const edgeTypes = {
+  default: CustomEdge
+}
+
 interface CanvasProps {
   nodes: CanvasNode[]
   setNodes: React.Dispatch<React.SetStateAction<CanvasNode[]>>
@@ -71,6 +104,7 @@ interface CanvasProps {
   onFilePreview: (context: PreviewContext) => void
   onFolderFileAdded: (nodeId: string, filePath: string) => void
   onAddFolderAtPosition: (folderPath: string, x: number, y: number) => void
+  onDuplicateNodes: (nodes: CanvasNode[]) => void
 }
 
 function ZoomHandler() {
@@ -242,8 +276,8 @@ function ZoomHandler() {
         top,
         width,
         height,
-        border: '2px dashed #525252',
-        backgroundColor: 'rgba(82, 82, 82, 0.1)',
+        border: '1px solid rgba(59, 130, 246, 0.6)',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
         pointerEvents: 'none',
         zIndex: 9999
       }}
@@ -253,23 +287,27 @@ function ZoomHandler() {
 
 interface SelectionOverlayProps {
   nodes: CanvasNode[]
+  edges: Edge[]
 }
 
-function SelectionOverlay({ nodes }: SelectionOverlayProps) {
+function SelectionOverlay({ nodes, edges }: SelectionOverlayProps) {
   const { getViewport } = useReactFlow()
+  const viewport = getViewport()
 
   const selectedNodes = nodes.filter(n => n.selected === true)
-  if (selectedNodes.length === 0) return null
+  const selectedEdges = edges.filter(e => e.selected === true)
 
-  // Calculate combined bounding box in flow coordinates
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  if (selectedNodes.length === 0 && selectedEdges.length === 0) return null
 
+  const padding = 6
   const REACT_FLOW_Y_OFFSET = 14
 
+  // Calculate combined bounding box for all selected items
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+  // Include selected nodes
   for (const node of selectedNodes) {
     if (node.type === 'drawing') {
-      // For drawings, use the points data
-      // Add Y offset to match where stroke actually renders (node position has -14 offset)
       const points = (node as DrawingNodeType).data.points
       if (points) {
         for (const p of points) {
@@ -282,10 +320,8 @@ function SelectionOverlay({ nodes }: SelectionOverlayProps) {
         }
       }
     } else {
-      // For other nodes, use measured dimensions or defaults
       const width = node.measured?.width ?? (node.type === 'terminal' ? 400 : 200)
       const height = node.measured?.height ?? (node.type === 'terminal' ? 300 : 80)
-
       if (node.position.x < minX) minX = node.position.x
       if (node.position.y < minY) minY = node.position.y
       if (node.position.x + width > maxX) maxX = node.position.x + width
@@ -293,14 +329,43 @@ function SelectionOverlay({ nodes }: SelectionOverlayProps) {
     }
   }
 
+  // Include selected edges
+  for (const edge of selectedEdges) {
+    const sourceNode = nodes.find(n => n.id === edge.source)
+    const targetNode = nodes.find(n => n.id === edge.target)
+    if (!sourceNode || !targetNode) continue
+
+    const sourceWidth = sourceNode.measured?.width ?? 200
+    const sourceHeight = sourceNode.measured?.height ?? 100
+    const targetWidth = targetNode.measured?.width ?? 200
+    const targetHeight = targetNode.measured?.height ?? 100
+
+    const sourceIsLeft = sourceNode.position.x < targetNode.position.x
+
+    const sourceX = sourceIsLeft
+      ? sourceNode.position.x + sourceWidth
+      : sourceNode.position.x
+    const sourceY = sourceNode.position.y + sourceHeight / 2
+
+    const targetX = sourceIsLeft
+      ? targetNode.position.x
+      : targetNode.position.x + targetWidth
+    const targetY = targetNode.position.y + targetHeight / 2
+
+    if (sourceX < minX) minX = sourceX
+    if (sourceY < minY) minY = sourceY
+    if (sourceX > maxX) maxX = sourceX
+    if (sourceY > maxY) maxY = sourceY
+    if (targetX < minX) minX = targetX
+    if (targetY < minY) minY = targetY
+    if (targetX > maxX) maxX = targetX
+    if (targetY > maxY) maxY = targetY
+  }
+
   if (minX === Infinity) return null
 
-  const padding = 6
-  const viewport = getViewport()
-
-  // Convert flow coords to screen coords
   const screenX = minX * viewport.zoom + viewport.x - padding
-  const screenY = minY * viewport.zoom + viewport.y - padding
+  const screenY = minY * viewport.zoom + viewport.y - padding + 28
   const screenWidth = (maxX - minX) * viewport.zoom + padding * 2
   const screenHeight = (maxY - minY) * viewport.zoom + padding * 2
 
@@ -309,10 +374,10 @@ function SelectionOverlay({ nodes }: SelectionOverlayProps) {
       style={{
         position: 'fixed',
         left: screenX,
-        top: screenY + 28, // Account for title bar
+        top: screenY,
         width: screenWidth,
         height: screenHeight,
-        border: '1px dashed #3b82f6',
+        border: '1.5px dashed #3B82F6',
         pointerEvents: 'none',
         zIndex: 1000
       }}
@@ -327,8 +392,10 @@ interface DrawingHandlerProps {
   setNodes: React.Dispatch<React.SetStateAction<CanvasNode[]>>
 }
 
+const STROKE_WIDTH = 3
+
 function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, getViewport } = useReactFlow()
   const { isZoomActive } = useCanvasContext()
   const [previewPath, setPreviewPath] = useState<string>('')
 
@@ -425,7 +492,7 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
         data: {
           pathData,
           color: drawColorRef.current,
-          strokeWidth: 2,
+          strokeWidth: STROKE_WIDTH,
           points: normalizedPoints
         }
       }
@@ -451,6 +518,10 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
   // Render preview stroke while drawing - use portal to escape ReactFlow's transform
   if (mode !== 'draw' || !previewPath) return null
 
+  // Scale stroke width by zoom so preview matches final render
+  const viewport = getViewport()
+  const scaledStrokeWidth = STROKE_WIDTH * viewport.zoom
+
   return createPortal(
     <svg
       style={{
@@ -466,7 +537,7 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
       <path
         d={previewPath}
         stroke={drawColor}
-        strokeWidth={2}
+        strokeWidth={scaledStrokeWidth}
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -476,9 +547,28 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
   )
 }
 
-function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition }: CanvasProps) {
+function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes }: CanvasProps) {
   const [isZoomActive, setIsZoomActive] = useState(false)
   const { screenToFlowPosition } = useReactFlow()
+  const duplicatedRef = useRef(false)
+
+  const handleNodeDragStart = useCallback((_event: React.MouseEvent, _node: CanvasNode) => {
+    // Check if Alt/Option key is held
+    if (_event.altKey && mode === 'select') {
+      // Get all selected nodes (or just the dragged one if none selected)
+      const selectedNodes = nodes.filter(n => n.selected)
+      const nodesToDuplicate = selectedNodes.length > 0 ? selectedNodes : [_node]
+
+      if (!duplicatedRef.current) {
+        duplicatedRef.current = true
+        onDuplicateNodes(nodesToDuplicate)
+      }
+    }
+  }, [nodes, mode, onDuplicateNodes])
+
+  const handleNodeDragStop = useCallback(() => {
+    duplicatedRef.current = false
+  }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -510,9 +600,44 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
     [setNodes]
   )
 
+  // Track if we're in a marquee drag
+  const isMarqueeRef = useRef(false)
+
+  useEffect(() => {
+    if (mode !== 'select') return
+
+    const onMouseDown = () => { isMarqueeRef.current = false }
+    const onMouseMove = () => {
+      if (document.querySelector('.react-flow__selection')) {
+        isMarqueeRef.current = true
+      }
+    }
+    const onMouseUp = () => {
+      setTimeout(() => { isMarqueeRef.current = false }, 50)
+    }
+
+    window.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [mode])
+
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      setEdges((eds) => applyEdgeChanges(changes, eds))
+      // Filter out selection changes during marquee - we handle edge marquee selection ourselves
+      const filteredChanges = changes.filter(change => {
+        if (change.type === 'select' && isMarqueeRef.current) {
+          return false // Block React Flow's marquee edge selection
+        }
+        return true
+      })
+      if (filteredChanges.length > 0) {
+        setEdges((eds) => applyEdgeChanges(filteredChanges, eds))
+      }
     },
     [setEdges]
   )
@@ -523,6 +648,82 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
     },
     [setEdges]
   )
+
+  const { getViewport } = useReactFlow()
+
+  // Track selection box coordinates during drag
+  const selectionBoxRef = useRef<{ left: number; top: number; right: number; bottom: number } | null>(null)
+
+  // Monitor selection box during drag
+  useEffect(() => {
+    if (mode !== 'select') return
+
+    const updateSelectionBox = () => {
+      const selectionBox = document.querySelector('.react-flow__selection') as HTMLElement
+      if (selectionBox) {
+        const boxRect = selectionBox.getBoundingClientRect()
+        const containerRect = document.querySelector('.react-flow')?.getBoundingClientRect()
+        if (containerRect) {
+          const viewport = getViewport()
+          selectionBoxRef.current = {
+            left: (boxRect.left - containerRect.left - viewport.x) / viewport.zoom,
+            top: (boxRect.top - containerRect.top - viewport.y) / viewport.zoom,
+            right: (boxRect.left - containerRect.left - viewport.x + boxRect.width) / viewport.zoom,
+            bottom: (boxRect.top - containerRect.top - viewport.y + boxRect.height) / viewport.zoom
+          }
+        }
+      }
+    }
+
+    const handleMouseMove = () => updateSelectionBox()
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [mode, getViewport])
+
+  // Handle marquee selection end - check for edge intersections
+  const onSelectionEnd = useCallback(() => {
+    const sel = selectionBoxRef.current
+    if (!sel) return
+
+    // Check each edge for intersection with selection box
+    setEdges(eds => eds.map(edge => {
+      const sourceNode = nodes.find(n => n.id === edge.source)
+      const targetNode = nodes.find(n => n.id === edge.target)
+      if (!sourceNode || !targetNode) return edge
+
+      const sourceWidth = sourceNode.measured?.width ?? 200
+      const sourceHeight = sourceNode.measured?.height ?? 100
+      const targetWidth = targetNode.measured?.width ?? 200
+      const targetHeight = targetNode.measured?.height ?? 100
+
+      // Determine which node is left vs right
+      const sourceIsLeft = sourceNode.position.x < targetNode.position.x
+
+      // Get actual handle positions (edges of nodes, not centers)
+      const sourceX = sourceIsLeft
+        ? sourceNode.position.x + sourceWidth
+        : sourceNode.position.x
+      const sourceY = sourceNode.position.y + sourceHeight / 2
+
+      const targetX = sourceIsLeft
+        ? targetNode.position.x
+        : targetNode.position.x + targetWidth
+      const targetY = targetNode.position.y + targetHeight / 2
+
+      // Check if line segment intersects rectangle
+      const intersects = lineIntersectsRect(
+        sourceX, sourceY, targetX, targetY,
+        sel.left, sel.top, sel.right, sel.bottom
+      )
+
+      if (intersects) {
+        return { ...edge, selected: true }
+      }
+      return edge
+    }))
+
+    selectionBoxRef.current = null
+  }, [nodes, setEdges])
 
   const contextValue = useMemo(
     () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded }),
@@ -542,7 +743,10 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView={false}
           minZoom={0.1}
           maxZoom={2}
@@ -554,10 +758,14 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
           selectionOnDrag={mode === 'select' && !isZoomActive}
           selectionMode={SelectionMode.Partial}
           selectNodesOnDrag={mode === 'select' && !isZoomActive}
+          edgesReconnectable
+          edgesFocusable
+          elementsSelectable={mode === 'select'}
           nodeDragThreshold={5}
           onPaneClick={() => setFocusedNodeId(null)}
+          onSelectionEnd={onSelectionEnd}
         >
-          <Background variant={BackgroundVariant.Dots} color="#d0d0d0" gap={16} size={2} />
+          <Background variant={BackgroundVariant.Dots} color="#b8b8b8" gap={16} size={2} />
           <Controls />
           <MiniMap
             nodeColor="#d4d4d4"
@@ -565,7 +773,7 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
           />
           <ZoomHandler />
           <DrawingHandler mode={mode} drawColor={drawColor} setNodes={setNodes} />
-          <SelectionOverlay nodes={nodes} />
+          <SelectionOverlay nodes={nodes} edges={edges} />
         </ReactFlow>
       </div>
     </CanvasContext.Provider>

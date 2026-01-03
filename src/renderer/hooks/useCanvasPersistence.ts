@@ -21,16 +21,27 @@ export function useCanvasPersistence(options: UseCanvasPersistenceOptions) {
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const isLoadingRef = useRef(false)
   const lastSavedRef = useRef<string>('')
+  const hasAutoLoadedRef = useRef(false)
+  const loadRef = useRef<((filename: string) => Promise<boolean>) | null>(null)
 
   // Refresh list of save files
   const refreshSaveFiles = useCallback(async () => {
     const files = await window.electronAPI.listCanvases()
     setSaveFiles(files)
+    return files
   }, [])
 
-  // Load save files on mount
+  // Load save files on mount and auto-load most recent
   useEffect(() => {
-    refreshSaveFiles()
+    const initAndAutoLoad = async () => {
+      const files = await refreshSaveFiles()
+      // Auto-load most recent file if we haven't already and there are files
+      if (!hasAutoLoadedRef.current && files.length > 0 && loadRef.current) {
+        hasAutoLoadedRef.current = true
+        await loadRef.current(files[0].filename)
+      }
+    }
+    initAndAutoLoad()
   }, [refreshSaveFiles])
 
   // Track changes to mark dirty (but not during load)
@@ -262,6 +273,9 @@ export function useCanvasPersistence(options: UseCanvasPersistenceOptions) {
       }, 500)
     }
   }, [options])
+
+  // Update ref for auto-load effect (set synchronously before effects run)
+  loadRef.current = load
 
   const newCanvas = useCallback(() => {
     // Kill existing PTYs and unwatchFolders
