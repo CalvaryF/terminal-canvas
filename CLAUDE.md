@@ -160,9 +160,36 @@ curl -X POST http://127.0.0.1:4000/api/v1/batch \
 
 **Temporary IDs**: Use `$name` syntax to reference nodes created earlier in the same batch. The `idMap` in the response shows the mapping from temp IDs to real UUIDs.
 
-**Supported operations**: `createTerminal`, `createQueue`, `createTextNode`, `createFolder`, `createEdge`, `deleteNode`, `deleteEdge`, `updateNode`, `addQueueCommand`, `setViewport`
+#### Supported Operations
 
-**Error handling**: Stops on first error, returns partial results with `failedAt` index.
+| Operation | Params | Notes |
+|-----------|--------|-------|
+| `createTerminal` | `{ cwd?, command?, title?, position?, cols?, rows? }` | Can assign tempId |
+| `createQueue` | `{ position? }` | Can assign tempId |
+| `createTextNode` | `{ text?, position? }` | Can assign tempId |
+| `createFolder` | `{ path, position? }` | Can assign tempId |
+| `createEdge` | `{ source, target }` | source/target can be tempIds |
+| `deleteNode` | `{ id }` | id can be tempId |
+| `deleteEdge` | `{ id }` | |
+| `updateNode` | `{ id, updates }` | id can be tempId |
+| `addQueueCommand` | `{ queueId, command }` | queueId can be tempId |
+| `setViewport` | `{ x, y, zoom }` | |
+
+#### Response Format
+
+```json
+{
+  "success": true,
+  "results": [
+    { "success": true, "data": { "id": "uuid-1", ... }, "tempId": "$t1" },
+    { "success": true, "data": { "id": "uuid-2", ... }, "tempId": "$q1" },
+    { "success": true, "data": { "id": "edge-uuid", ... } }
+  ],
+  "idMap": { "$t1": "uuid-1", "$q1": "uuid-2" }
+}
+```
+
+**Error handling**: Stops on first error, returns partial results with `failedAt` index indicating which operation failed.
 
 ### WebSocket Streaming
 
