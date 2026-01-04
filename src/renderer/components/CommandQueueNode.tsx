@@ -91,22 +91,32 @@ const CommandQueueNodeComponent = memo(function CommandQueueNodeComponent({
       <div className={`command-queue-body ${isHandMode ? '' : 'nodrag nowheel nopan'}`}>
         {isAdding && (
           <div className="command-input-row">
-            <input
-              type="text"
+            <textarea
               className="command-input"
-              placeholder="Enter command..."
+              placeholder="Enter command or prompt..."
               value={newCommand}
               onChange={(e) => setNewCommand(e.target.value)}
               onKeyDown={handleKeyDown}
               autoFocus
             />
-            <button
-              className="command-input-submit"
-              onClick={handleAddCommand}
-              disabled={!newCommand.trim()}
-            >
-              ↵
-            </button>
+            <div className="command-input-actions">
+              <button
+                className="command-input-submit"
+                onClick={() => {
+                  setIsAdding(false)
+                  setNewCommand('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="command-input-submit"
+                onClick={handleAddCommand}
+                disabled={!newCommand.trim()}
+              >
+                Add
+              </button>
+            </div>
           </div>
         )}
 
@@ -150,6 +160,12 @@ const CommandQueueNodeComponent = memo(function CommandQueueNodeComponent({
         )}
       </div>
 
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="target"
+        className="node-handle"
+      />
       <Handle
         type="source"
         position={Position.Right}

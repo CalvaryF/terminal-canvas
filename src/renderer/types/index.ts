@@ -34,6 +34,7 @@ export interface FolderNodeData {
   folderPath: string
   files: FileInfo[]
   isWatching: boolean
+  promptTemplate?: string  // Template for generating commands, uses {filepath} placeholder
 }
 
 export interface CommandItem {

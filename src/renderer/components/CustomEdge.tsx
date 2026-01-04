@@ -17,7 +17,8 @@ export default function CustomEdge({
     sourcePosition,
     targetX,
     targetY,
-    targetPosition
+    targetPosition,
+    borderRadius: 16
   })
 
   return <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />

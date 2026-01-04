@@ -3,6 +3,111 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useCanvasContext } from './Canvas'
 import type { FolderNodeData, FileInfo } from '../types'
 
+interface PromptTemplateProps {
+  template: string | undefined
+  onChange: (template: string) => void
+  isHandMode: boolean
+}
+
+function PromptTemplateSection({ template, onChange, isHandMode }: PromptTemplateProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(template || '')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus()
+      textareaRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleSave = () => {
+    onChange(editValue)
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation()
+    if (e.key === 'Enter' && e.metaKey) {
+      e.preventDefault()
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setEditValue(template || '')
+      setIsEditing(false)
+    }
+  }
+
+  if (!template && !isEditing) {
+    return (
+      <div
+        className={`folder-prompt-empty ${isHandMode ? '' : 'nodrag nowheel nopan'}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!isHandMode) {
+            setEditValue('')
+            setIsEditing(true)
+          }
+        }}
+      >
+        <span className="folder-prompt-placeholder">+ Add prompt template</span>
+      </div>
+    )
+  }
+
+  if (isEditing) {
+    return (
+      <div className={`folder-prompt-edit ${isHandMode ? '' : 'nodrag nowheel nopan'}`}>
+        <textarea
+          ref={textareaRef}
+          className="folder-prompt-textarea"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter prompt template... Use {filepath} for the file path"
+        />
+        <div className="folder-prompt-actions">
+          <button
+            className="folder-prompt-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditValue(template || '')
+              setIsEditing(false)
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            className="folder-prompt-btn folder-prompt-btn-save"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSave()
+            }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`folder-prompt-display ${isHandMode ? '' : 'nodrag nowheel nopan'}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (!isHandMode) {
+          setEditValue(template)
+          setIsEditing(true)
+        }
+      }}
+      title="Click to edit prompt template"
+    >
+      <div className="folder-prompt-label">Prompt Template:</div>
+      <div className="folder-prompt-text">{template}</div>
+    </div>
+  )
+}
+
 const getFileIcon = (file: FileInfo): string => {
   if (file.isDirectory) return '📁'
   if (file.isImage) return '🖼️'
@@ -31,9 +136,15 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
   id,
   data
 }: FolderNodeComponentProps) {
-  const { mode, onFilePreview, onFolderFileAdded } = useCanvasContext()
+  const { mode, onFilePreview, onFolderFileAdded, onFolderPromptChange } = useCanvasContext()
   const isHandMode = mode === 'hand'
   const [files, setFiles] = useState<FileInfo[]>(data.files || [])
+
+  const handlePromptChange = useCallback((template: string) => {
+    if (onFolderPromptChange) {
+      onFolderPromptChange(id, template)
+    }
+  }, [id, onFolderPromptChange])
 
   // Use ref for callback to avoid recreating watcher when callback changes
   const onFolderFileAddedRef = useRef(onFolderFileAdded)
@@ -113,6 +224,11 @@ const FolderNodeComponent = memo(function FolderNodeComponent({
           </ul>
         )}
       </div>
+      <PromptTemplateSection
+        template={data.promptTemplate}
+        onChange={handlePromptChange}
+        isHandMode={isHandMode}
+      />
       <Handle
         type="target"
         position={Position.Left}

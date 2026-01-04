@@ -190,6 +190,7 @@ export interface CreateEdgeRequest {
   target: string
   sourceHandle?: string
   targetHandle?: string
+  data?: Record<string, unknown>
 }
 
 export interface UpdateNodePositionRequest {

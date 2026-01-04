@@ -24,6 +24,7 @@ import DrawingNode from './DrawingNode'
 import FolderNode from './FolderNode'
 import CommandQueueNode from './CommandQueueNode'
 import CustomEdge from './CustomEdge'
+import { PromptTemplateModal } from './PromptTemplateModal'
 import type { CanvasNode, DrawingNode as DrawingNodeType, FolderNode as FolderNodeType, FileInfo, CommandItem } from '../types'
 import type { CanvasMode } from '../App'
 import type { PreviewContext } from './FilePreviewModal'
@@ -68,6 +69,9 @@ interface CanvasContextType {
   onFolderFileAdded: ((nodeId: string, filePath: string) => void) | null
   onSendCommand: ((queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void) | null
   onTextChange: ((nodeId: string, text: string) => void) | null
+  onNodeResize: ((nodeId: string, width: number, height: number) => void) | null
+  onTerminalTitleChange: ((nodeId: string, title: string) => void) | null
+  onFolderPromptChange: ((nodeId: string, promptTemplate: string) => void) | null
 }
 
 export const CanvasContext = createContext<CanvasContextType>({
@@ -80,7 +84,10 @@ export const CanvasContext = createContext<CanvasContextType>({
   onFilePreview: null,
   onFolderFileAdded: null,
   onSendCommand: null,
-  onTextChange: null
+  onTextChange: null,
+  onNodeResize: null,
+  onTerminalTitleChange: null,
+  onFolderPromptChange: null
 })
 
 export const useCanvasContext = () => useContext(CanvasContext)
@@ -110,9 +117,11 @@ interface CanvasProps {
   onFilePreview: (context: PreviewContext) => void
   onFolderFileAdded: (nodeId: string, filePath: string) => void
   onAddFolderAtPosition: (folderPath: string, x: number, y: number) => void
-  onDuplicateNodes: (nodes: CanvasNode[]) => void
   onSendCommand: (queueId: string, action: 'add' | 'send' | 'remove', payload: CommandItem | string) => void
   onTextChange: (nodeId: string, text: string) => void
+  onNodeResize: (nodeId: string, width: number, height: number) => void
+  onTerminalTitleChange: (nodeId: string, title: string) => void
+  onFolderPromptChange: (nodeId: string, promptTemplate: string) => void
 }
 
 function ZoomHandler() {
@@ -555,27 +564,43 @@ function DrawingHandler({ mode, drawColor, setNodes }: DrawingHandlerProps) {
   )
 }
 
-function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onDuplicateNodes, onSendCommand, onTextChange }: CanvasProps) {
+function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNodeId, onRemoveNode, mode, drawColor, onFilePreview, onFolderFileAdded, onAddFolderAtPosition, onSendCommand, onTextChange, onNodeResize, onTerminalTitleChange, onFolderPromptChange }: CanvasProps) {
   const [isZoomActive, setIsZoomActive] = useState(false)
   const { screenToFlowPosition } = useReactFlow()
-  const duplicatedRef = useRef(false)
+
+  // Track if we're in an option+drag operation
+  const isOptionDragRef = useRef(false)
+
+  // Modal state for folder→terminal prompt template
+  const [showPromptModal, setShowPromptModal] = useState(false)
+  const [pendingConnection, setPendingConnection] = useState<Connection | null>(null)
 
   const handleNodeDragStart = useCallback((_event: React.MouseEvent, _node: CanvasNode) => {
-    // Check if Alt/Option key is held
+    // Check if Alt/Option key is held for duplication
     if (_event.altKey && mode === 'select') {
-      // Get all selected nodes (or just the dragged one if none selected)
+      isOptionDragRef.current = true
+
+      // Get nodes being dragged
       const selectedNodes = nodes.filter(n => n.selected)
       const nodesToDuplicate = selectedNodes.length > 0 ? selectedNodes : [_node]
 
-      if (!duplicatedRef.current) {
-        duplicatedRef.current = true
-        onDuplicateNodes(nodesToDuplicate)
-      }
+      // Immediately create duplicates at original positions (these stay in place)
+      // The originals will be dragged by React Flow
+      const duplicates = nodesToDuplicate.map(n => ({
+        ...n,
+        id: crypto.randomUUID(),
+        selected: false,
+        // Reset terminal/folder specific state
+        ...(n.type === 'terminal' ? { data: { ...n.data, cwd: '' } } : {}),
+        ...(n.type === 'folder' ? { data: { ...n.data, files: [], isWatching: true } } : {})
+      })) as CanvasNode[]
+
+      setNodes(nds => [...nds, ...duplicates])
     }
-  }, [nodes, mode, onDuplicateNodes])
+  }, [nodes, mode, setNodes])
 
   const handleNodeDragStop = useCallback(() => {
-    duplicatedRef.current = false
+    isOptionDragRef.current = false
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -652,10 +677,36 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      const sourceNode = nodes.find(n => n.id === connection.source)
+      const targetNode = nodes.find(n => n.id === connection.target)
+
+      // Only queues can connect to terminals
+      if (targetNode?.type === 'terminal' && sourceNode?.type !== 'queue') {
+        console.log('[Canvas] Blocked connection: only queues can connect to terminals')
+        return
+      }
+
       setEdges((eds) => addEdge(connection, eds))
     },
-    [setEdges]
+    [setEdges, nodes]
   )
+
+  // Handle prompt template modal submission
+  const handlePromptTemplateSubmit = useCallback((template: string) => {
+    if (pendingConnection) {
+      // Add edge with prompt template data
+      setEdges((eds) => addEdge({
+        ...pendingConnection,
+        data: { promptTemplate: template }
+      }, eds))
+      setPendingConnection(null)
+    }
+  }, [pendingConnection, setEdges])
+
+  const handlePromptModalClose = useCallback(() => {
+    setShowPromptModal(false)
+    setPendingConnection(null)
+  }, [])
 
   const { getViewport } = useReactFlow()
 
@@ -734,8 +785,8 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
   }, [nodes, setEdges])
 
   const contextValue = useMemo(
-    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange }),
-    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange]
+    () => ({ focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, setIsZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange, onNodeResize, onTerminalTitleChange, onFolderPromptChange }),
+    [focusedNodeId, setFocusedNodeId, onRemoveNode, mode, isZoomActive, onFilePreview, onFolderFileAdded, onSendCommand, onTextChange, onNodeResize, onTerminalTitleChange, onFolderPromptChange]
   )
 
   return (
@@ -766,6 +817,7 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
           selectionOnDrag={mode === 'select' && !isZoomActive}
           selectionMode={SelectionMode.Partial}
           selectNodesOnDrag={mode === 'select' && !isZoomActive}
+          elevateNodesOnSelect={false}
           edgesReconnectable
           edgesFocusable
           elementsSelectable={mode === 'select'}
@@ -784,6 +836,11 @@ function Canvas({ nodes, setNodes, edges, setEdges, focusedNodeId, setFocusedNod
           <SelectionOverlay nodes={nodes} edges={edges} />
         </ReactFlow>
       </div>
+      <PromptTemplateModal
+        isOpen={showPromptModal}
+        onClose={handlePromptModalClose}
+        onSubmit={handlePromptTemplateSubmit}
+      />
     </CanvasContext.Provider>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -11,7 +11,7 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   id,
   data
 }: TerminalNodeComponentProps) {
-  const { focusedNodeId, setFocusedNodeId, mode } = useCanvasContext()
+  const { focusedNodeId, setFocusedNodeId, mode, onTerminalTitleChange } = useCanvasContext()
   const isFocused = focusedNodeId === id
   const isHandMode = mode === 'hand'
 
@@ -19,6 +19,10 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
   const xtermRef = useRef<Terminal | null>(null)
   const initializedRef = useRef(false)
   const zoomModeRef = useRef(false)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleText, setTitleText] = useState(data.title)
 
   // Track z key to prevent focusing terminal during zoom
   useEffect(() => {
@@ -203,12 +207,54 @@ const TerminalNodeComponent = memo(function TerminalNodeComponent({
     }
   }
 
+  const handleTitleDoubleClick = () => {
+    setIsEditingTitle(true)
+    setTitleText(data.title)
+  }
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false)
+    if (onTerminalTitleChange && titleText.trim()) {
+      onTerminalTitleChange(id, titleText.trim())
+    }
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleBlur()
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false)
+      setTitleText(data.title)
+    }
+    e.stopPropagation()
+  }
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
+
   return (
     <div
       className={`terminal-node ${isFocused ? 'focused' : ''}`}
     >
-      <div className="terminal-header dragHandle">
-        <span className="terminal-title">{data.title}</span>
+      <div className="terminal-header dragHandle" onDoubleClick={handleTitleDoubleClick}>
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            type="text"
+            className="terminal-title-input"
+            value={titleText}
+            onChange={(e) => setTitleText(e.target.value)}
+            onBlur={handleTitleBlur}
+            onKeyDown={handleTitleKeyDown}
+          />
+        ) : (
+          <span className="terminal-title">{data.title}</span>
+        )}
       </div>
       <div
         className={`terminal-body ${isHandMode ? '' : 'nodrag nowheel'}`}

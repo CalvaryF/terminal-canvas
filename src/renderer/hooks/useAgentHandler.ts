@@ -30,6 +30,7 @@ interface CreateEdgeOptions {
   target: string
   sourceHandle?: string
   targetHandle?: string
+  data?: Record<string, unknown>
 }
 
 interface UseAgentHandlerOptions {
@@ -281,7 +282,8 @@ export function useAgentHandler(options: UseAgentHandlerOptions) {
       source: opts.source,
       target: opts.target,
       sourceHandle: opts.sourceHandle,
-      targetHandle: opts.targetHandle
+      targetHandle: opts.targetHandle,
+      data: opts.data
     }
 
     setEdges(eds => [...eds, newEdge])

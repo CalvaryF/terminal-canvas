@@ -48,16 +48,18 @@ export interface SaveFileMetadata {
   nodeCount: number
 }
 
-// Store callbacks by nodeId
-const dataCallbacks = new Map<string, (data: string) => void>()
+// Store callbacks by nodeId - arrays to support multiple listeners
+const dataCallbacks = new Map<string, Array<{ id: string; callback: (data: string) => void }>>()
 const exitCallbacks = new Map<string, (exitCode: number) => void>()
 const fileAddedCallbacks = new Map<string, (file: FileInfo) => void>()
 
 // Register global listeners once at load time
 ipcRenderer.on(IPC_CHANNELS.PTY_DATA, (_, nodeId: string, data: string) => {
-  const callback = dataCallbacks.get(nodeId)
-  if (callback) {
-    callback(data)
+  const callbacks = dataCallbacks.get(nodeId)
+  if (callbacks) {
+    for (const { callback } of callbacks) {
+      callback(data)
+    }
   }
 })
 
@@ -195,8 +197,21 @@ const electronAPI: ElectronAPI = {
     return ipcRenderer.invoke(IPC_CHANNELS.PTY_GET_CWD, nodeId)
   },
   onPtyData: (nodeId, callback) => {
-    dataCallbacks.set(nodeId, callback)
-    return () => dataCallbacks.delete(nodeId)
+    const listenerId = crypto.randomUUID()
+    const listeners = dataCallbacks.get(nodeId) || []
+    listeners.push({ id: listenerId, callback })
+    dataCallbacks.set(nodeId, listeners)
+    return () => {
+      const current = dataCallbacks.get(nodeId)
+      if (current) {
+        const filtered = current.filter(l => l.id !== listenerId)
+        if (filtered.length > 0) {
+          dataCallbacks.set(nodeId, filtered)
+        } else {
+          dataCallbacks.delete(nodeId)
+        }
+      }
+    }
   },
   onPtyExit: (nodeId, callback) => {
     exitCallbacks.set(nodeId, callback)
